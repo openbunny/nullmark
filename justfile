@@ -15,6 +15,11 @@
 #                   # xcodegen, zizmor and the rest of the pinned toolchain
 set shell := ["bash", "-uc"]
 
+# clang-format and clang-tidy ship in the Homebrew LLVM prefix, which is not on
+# PATH by default. Export it here so the fmt and lint gates resolve the same
+# tools locally and in CI, where no step can adjust PATH for the just call.
+export PATH := "/opt/homebrew/opt/llvm/bin:" + env('PATH')
+
 c_glob := "CTask4PDF/*.c CTask4PDF/**/*.c CTask4PDF/*.h CTask4PDF/**/*.h App/*.h App/**/*.h"
 llvm_bin := "/opt/homebrew/opt/llvm/bin"
 mupdf_lib := "/opt/homebrew/lib/libmupdf.dylib"
@@ -36,6 +41,7 @@ ci-check: install
 
 install:
     mise install
+    brew bundle
     cd tests && uv sync --frozen
 
 # No runner here continues past a failing gate and reports every failure together.
