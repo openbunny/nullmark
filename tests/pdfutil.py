@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 import re
+from typing import Final
 
-_HEADER_RE = re.compile(r"%PDF-(\d\.\d)")
-_TRAILER_RE = re.compile(r"trailer\s*\n?\s*<<(.*?)>>\s*\nstartxref", re.DOTALL)
-_ID_RE = re.compile(r"/ID\s*\[")
-_STREAM_RE = re.compile(r"stream\r?\n(.*?)\r?\nendstream", re.DOTALL)
+_HEADER_RE: Final = re.compile(r"%PDF-(\d\.\d)")
+_TRAILER_RE: Final = re.compile(r"trailer\s*\n?\s*<<(.*?)>>\s*\nstartxref", re.DOTALL)
+_ID_RE: Final = re.compile(r"/ID\s*\[")
+_STREAM_RE: Final = re.compile(r"stream\r?\n(.*?)\r?\nendstream", re.DOTALL)
 
-_LITERAL_ESCAPES = {
+_LITERAL_ESCAPES: Final = {
     "n": 10,
     "r": 13,
     "t": 9,
@@ -17,7 +18,9 @@ _LITERAL_ESCAPES = {
     ")": 41,
     "\\": 92,
 }
-_MAX_OCTAL_ESCAPE_DIGITS = 3
+_MAX_OCTAL_ESCAPE_DIGITS: Final = 3
+
+_NAME_DELIMITERS: Final = frozenset(" \t\r\n\f\x00/[]<>(){}%")
 
 
 def header_version(text: str) -> str:
@@ -111,6 +114,30 @@ def stream_payload(obj_body: str) -> str:
 
 def normalize_ws(s: str) -> str:
     return re.sub(r"\s+", " ", s).strip()
+
+
+def name_values(text: str) -> list[str]:
+    text = _STREAM_RE.sub("stream\n\nendstream", text)
+    out: list[str] = []
+    i = 0
+    n = len(text)
+    while i < n:
+        c = text[i]
+        if c == "(" or (c == "<" and (i + 1 >= n or text[i + 1] != "<")):
+            try:
+                _, i = _decode_pdf_string(text, i)
+            except (AssertionError, IndexError, ValueError):
+                i += 1
+            continue
+        if c != "/":
+            i += 1
+            continue
+        j = i + 1
+        while j < n and text[j] not in _NAME_DELIMITERS:
+            j += 3 if text[j] == "#" and j + 2 < n else 1
+        out.append(text[i + 1 : j])
+        i = j
+    return out
 
 
 def string_values(text: str) -> list[str]:

@@ -1,11 +1,13 @@
 from __future__ import annotations
 
+import re
 import shutil
 import string
 import subprocess
 import sys
 import tempfile
 from pathlib import Path
+from typing import Final
 
 import pytest
 from hypothesis import HealthCheck, given, settings
@@ -21,12 +23,12 @@ from fixtures.generate import (
     generate_all,
 )
 
-NULLMARK_DIR = Path(__file__).resolve().parents[1]
-MUPDF_INCLUDE = Path("/opt/homebrew/include")
-MUPDF_LIB = Path("/opt/homebrew/lib")
-_BENIGN_STREAM_TEXT = BENIGN_BODY.decode("latin-1")
-_XMP_WRAPPER_TEXT = XMP_TEMPLATE.format(title="")
-REPLACEMENT = "NEWNAME"
+NULLMARK_DIR: Final = Path(__file__).resolve().parents[1]
+MUPDF_INCLUDE: Final = Path("/opt/homebrew/include")
+MUPDF_LIB: Final = Path("/opt/homebrew/lib")
+_BENIGN_STREAM_TEXT: Final = BENIGN_BODY.decode("latin-1")
+_XMP_WRAPPER_TEXT: Final = XMP_TEMPLATE.format(title="")
+REPLACEMENT: Final = "NEWNAME"
 
 
 def _mupdf_available() -> bool:
@@ -91,30 +93,28 @@ def _run_cli(
 
 
 def _result_fields(stdout: str) -> dict[str, int]:
-    import re
-
     return {
         k: int(v) for k, v in re.findall(r"(rc|matches|pages|residual)=(-?\d+)", stdout)
     }
 
 
-_unicode_target = st.text(
+_unicode_target: Final = st.text(
     alphabet=st.characters(
         min_codepoint=0x21, max_codepoint=0x10FFFF, exclude_categories=("Cs", "Cc")
     ),
     min_size=1,
     max_size=12,
 )
-_metachar_target = st.text(alphabet="()\\<>[]{}%/#\r\n", min_size=1, max_size=6)
-TARGET_STRATEGY = st.one_of(_unicode_target, _metachar_target)
-MARKER_STRATEGY = st.text(alphabet=string.ascii_letters, min_size=3, max_size=8)
-SURFACES_STRATEGY = st.lists(
+_metachar_target: Final = st.text(alphabet="()\\<>[]{}%/#\r\n", min_size=1, max_size=6)
+TARGET_STRATEGY: Final = st.one_of(_unicode_target, _metachar_target)
+MARKER_STRATEGY: Final = st.text(alphabet=string.ascii_letters, min_size=3, max_size=8)
+SURFACES_STRATEGY: Final = st.lists(
     st.sampled_from(sorted(COMBO_SURFACES)),
     min_size=1,
     max_size=len(COMBO_SURFACES),
     unique=True,
 ).map(frozenset)
-OCCURRENCES_STRATEGY = st.integers(min_value=1, max_value=3)
+OCCURRENCES_STRATEGY: Final = st.integers(min_value=1, max_value=3)
 
 
 def _combo_value_texts(text: str, surfaces: frozenset[str]) -> list[str]:
@@ -126,6 +126,23 @@ def _combo_value_texts(text: str, surfaces: frozenset[str]) -> list[str]:
         payload = pdf.stream_payload(metadata)
         values.append(payload.encode("latin-1").decode("utf-8"))
     return values
+
+
+_ID_RE: Final = re.compile(rb"/ID\s*\[\s*<([0-9A-Fa-f]+)>")
+
+_REPLACEMENT_POOL: Final = "0123456789!@#$%^&*()-_=+[]{};:,.<>?/|~"
+
+
+def _replacement_for(target: str, marker: str) -> str:
+    used = set(target) | set(marker)
+    pool = [c for c in _REPLACEMENT_POOL if c not in used]
+    assert pool, f"replacement pool exhausted by target={target!r} marker={marker!r}"
+    return "".join(pool[:6])
+
+
+def _fixture_id_digest(raw: bytes) -> bytes:
+    m = _ID_RE.search(raw)
+    return bytes.fromhex(m.group(1).decode("ascii")) if m else b""
 
 
 @settings(
@@ -158,20 +175,35 @@ def test_scrub_completeness_and_preservation_across_surfaces(
         in_pdf = tmp_path / "in.pdf"
         out_pdf = tmp_path / "out.pdf"
         build_combo(in_pdf, target, marker, surfaces, occurrences=occurrences)
-
         in_clean = _clean(in_pdf, tmp_path / "in.clean.pdf")
         in_values = _combo_value_texts(in_clean, surfaces)
         assert any(target in v for v in in_values), (
             "fixture does not carry the target in any decoded string value"
         )
+        unremovable = any(target in n for n in pdf.name_values(in_clean)) or (
+            target.encode("utf-8") in _fixture_id_digest(in_pdf.read_bytes())
+        )
 
-        result = _run_cli(cli_binary, in_pdf, out_pdf, target, REPLACEMENT)
-        assert out_pdf.exists(), (
-            f"CLI produced no output; stdout={result.stdout!r} stderr={result.stderr!r}"
+        result = _run_cli(
+            cli_binary, in_pdf, out_pdf, target, _replacement_for(target, marker)
         )
         fields = _result_fields(result.stdout)
-        assert fields["rc"] == 0, f"non-zero rc; stdout={result.stdout!r}"
-        assert fields["residual"] == 0, f"residual not zero; stdout={result.stdout!r}"
+
+        if fields["rc"] != 0 or fields["residual"] != 0:
+            assert not out_pdf.exists(), (
+                f"wrote output for a target left in the file's structure; "
+                f"stdout={result.stdout!r}"
+            )
+            assert unremovable, (
+                f"refused a removable target; target={target!r} "
+                f"surfaces={sorted(surfaces)} stdout={result.stdout!r}"
+            )
+            return
+
+        assert out_pdf.exists(), (
+            f"CLI reported a clean run but wrote no output; "
+            f"stdout={result.stdout!r} stderr={result.stderr!r}"
+        )
         assert fields["matches"] >= 1, (
             f"no replacement counted; stdout={result.stdout!r}"
         )
