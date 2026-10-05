@@ -1,0 +1,10 @@
+.DS_Store
+build/
+DerivedData/
+*.xcodeproj/
+*.xcresult/
+__pycache__/
+.pytest_cache/
+tests/.venv/
+.hypothesis/
+CTask4PDF/fuzz/crash-*/

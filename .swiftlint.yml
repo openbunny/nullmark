@@ -1,0 +1,11 @@
+included:
+  - App
+  - AppTests
+disabled_rules:
+  - prefer_nimble
+# swift-format adds a trailing comma to every multiline collection literal and
+# fmt-check enforces its output, so the linter must require the same form:
+# SwiftLint 0.65 changed this rule's default to forbid them, which no
+# formatted file can satisfy.
+trailing_comma:
+  mandatory_comma: true

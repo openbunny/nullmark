@@ -1,0 +1,22 @@
+# bugprone-easily-swappable-parameters  api: t4_replace's four string parameters are the documented interop signature.
+# performance-no-int-to-ptr             macro: fired only inside MuPDF's PDF_NAME() expansion.
+# readability-identifier-length         scope: docs/CODING-STANDARD.md mandates short names in small scope.
+# readability-uppercase-literal-suffix  convention: lowercase f is the C float suffix; the l/1 ambiguity it targets does not apply.
+# readability-function-cognitive-complexity  noisy: the shared C standard sets no cognitive-complexity threshold, and its helper rule forbids the single-use extraction this would force.
+# clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling  annex-k: demands the C11 Annex K _s functions, which macOS libc does not provide.
+Checks: >
+  -*,
+  bugprone-*,
+  cert-*,
+  clang-analyzer-*,
+  performance-*,
+  portability-*,
+  readability-*,
+  -bugprone-easily-swappable-parameters,
+  -performance-no-int-to-ptr,
+  -readability-identifier-length,
+  -readability-uppercase-literal-suffix,
+  -readability-function-cognitive-complexity,
+  -clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling
+WarningsAsErrors: '*'
+HeaderFilterRegex: 'task4pdf\.h$'

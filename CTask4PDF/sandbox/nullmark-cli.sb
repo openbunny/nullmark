@@ -1,0 +1,66 @@
+; Seatbelt profile for the nullmark-cli entry point (CTask4PDF/task4pdf.c,
+; #ifdef T4_MAIN). App.entitlements carries no App Sandbox entitlement (see
+; docs/standards/native-code.md and apps/nullmark/project.yml), so this is the
+; substitute containment for the CLI: t4_replace parses an untrusted,
+; caller-supplied PDF through MuPDF, a large C parser with a history of
+; memory-corruption CVEs, so a crafted PDF that gains code execution inside
+; this process should not be able to reach the network or write outside the
+; one output path the run was invoked with.
+;
+; Invoke with `sandbox-exec -f nullmark-cli.sb -D BIN_PATH=... -D IN_PATH=...
+; -D OUT_PATH=... -- "$BIN_PATH" "$IN_PATH" "$OUT_PATH" find replace`
+; (run-sandboxed.sh in this directory does this). BIN_PATH, IN_PATH and
+; OUT_PATH must be absolute paths: SBPL matches a `(param ...)` value as a
+; literal string, so a relative path would not match the absolute path the
+; kernel presents at the syscall boundary.
+(version 1)
+(deny default)
+
+; The root directory's own vnode (its metadata/listing, not its subtree):
+; some part of process launch on a sealed-system-volume macOS (observed:
+; dyld/posix_spawn's startup path resolution) reads "/" itself before main()
+; runs, on every dynamically linked Mach-O binary tested, nullmark-cli included.
+; Without this, sandbox-exec's child aborts (SIGABRT) before any task4pdf.c
+; code executes — confirmed by bisecting a trivial libSystem-only binary
+; against this same profile skeleton. `file-read-metadata` alone is not
+; enough; the fuller `file-read*` on the literal root is what the launch path
+; needs. This is the one rule in this profile not scoped to BIN/IN/OUT_PATH,
+; and it grants nothing about the contents of any file under any directory.
+(allow file-read* (literal "/"))
+
+; No socket of any kind, inbound or outbound: t4_replace has no legitimate
+; network use, and this is the one rule that turns a code-execution exploit
+; into one that cannot exfiltrate anything it read.
+(deny network*)
+
+; The process itself: exec'd once by sandbox-exec, forks none of its own.
+; The exec needs read access to the binary itself, not just the process-exec
+; check: the kernel maps the Mach-O image from disk to run it.
+(allow process-exec* (literal (param "BIN_PATH")))
+(allow file-read* (literal (param "BIN_PATH")))
+(allow process-fork)
+
+; Dynamic linking: dyld, libSystem, and MuPDF plus the Homebrew dylibs it
+; transitively links (freetype, harfbuzz, openssl, libcurl and more — see
+; `otool -L` on the built binary and on libmupdf.dylib). All of this is
+; read-only, fixed-path system and library data, never the untrusted PDF
+; content, so a broad read allowance here does not weaken the containment
+; that matters: no write, no network, outside the two paths below.
+(allow file-read*
+    (subpath "/usr/lib")
+    (subpath "/System/Library")
+    (subpath "/private/var/db/dyld")
+    (subpath "/opt/homebrew"))
+(allow file-read-metadata (subpath "/private/var/db/timezone"))
+(allow file-read* (literal "/private/etc/localtime"))
+(allow sysctl-read)
+(allow mach-lookup)
+
+; The untrusted input: read-only, never written or deleted.
+(allow file-read* (literal (param "IN_PATH")))
+
+; The redacted output: t4_replace creates it, reopens it for the post-write
+; residual re-scan, and — on a non-zero residual or any failure past that
+; point — deletes it (discard_output in task4pdf.c). All of that is this one
+; path; nothing else on disk is ever created, written or removed.
+(allow file-read* file-write* (literal (param "OUT_PATH")))

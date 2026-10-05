@@ -1,0 +1,30 @@
+[project]
+name = "nullmark-tests"
+version = "0.1.0"
+requires-python = ">=3.12"
+# Test-only project: every dependency below is test tooling. hypothesis is a
+# required import in test_redactor_hypothesis.py; fontTools backs the CID-font
+# fixture in fixtures/generate.py; mypy is the typecheck gate's interpreter.
+dependencies = [
+  "fonttools==4.65.0",
+  "hypothesis==6.168.4",
+  "mypy==2.4.0",
+  "pytest==9.1.1",
+]
+
+[tool.ruff]
+
+# Complexity stays at ruff's built-in default of 10.
+[tool.ruff.lint.mccabe]
+max-complexity = 10
+
+[tool.mypy]
+strict = true
+python_version = "3.12"
+files = [ "." ]
+
+[[tool.mypy.overrides]]
+# fontTools is an optional dependency (README.md): only the CID-font fixture needs it, imported
+# lazily inside a try/except ImportError, and it ships no type stubs.
+module = [ "fontTools.*" ]
+ignore_missing_imports = true
