@@ -6,6 +6,7 @@ import shutil
 import subprocess
 import sys
 from pathlib import Path
+from typing import Final
 
 import pytest
 
@@ -27,13 +28,13 @@ from fixtures.generate import (
 )
 from mupdf_discovery import discover_mupdf
 
-NULLMARK_DIR = Path(__file__).resolve().parents[1]
-TARGET = "OLDNAME"
-REPLACEMENT = "NEWNAME"
+NULLMARK_DIR: Final = Path(__file__).resolve().parents[1]
+TARGET: Final = "OLDNAME"
+REPLACEMENT: Final = "NEWNAME"
 
-_DISCOVERED = discover_mupdf()
-MUPDF_INCLUDE = _DISCOVERED[0] if _DISCOVERED else Path("/opt/homebrew/include")
-MUPDF_LIB = _DISCOVERED[1] if _DISCOVERED else Path("/opt/homebrew/lib")
+_DISCOVERED: Final = discover_mupdf()
+MUPDF_INCLUDE: Final = _DISCOVERED[0] if _DISCOVERED else Path("/opt/homebrew/include")
+MUPDF_LIB: Final = _DISCOVERED[1] if _DISCOVERED else Path("/opt/homebrew/lib")
 
 
 def _mupdf_available() -> bool:
@@ -43,7 +44,7 @@ def _mupdf_available() -> bool:
 if not _mupdf_available():
     _reason = (
         "mupdf not found (checked pkg-config, `brew --prefix mupdf`, /opt/homebrew and "
-        "/usr/local -- install with `brew install mupdf`), or no `cc`/`mutool` on PATH."
+        "/usr/local), or no `cc`/`mutool` on PATH."
     )
     if os.environ.get("NULLMARK_REQUIRE_MUPDF"):
         pytest.fail(
@@ -193,7 +194,7 @@ def test_replace_preserves_metadata(
     assert in_xmp == out_xmp, "XMP packet changed"
 
 
-SCRUBBED_SURFACES = {
+SCRUBBED_SURFACES: Final = {
     "info": "Nullmark info fixture",
     "xmp": "Nullmark xmp fixture",
     "outline": "Nullmark outline fixture",
@@ -203,7 +204,7 @@ SCRUBBED_SURFACES = {
     "name_value": "Nullmark name-value fixture",
 }
 
-UNRELATED_INFO_FIELDS = {
+UNRELATED_INFO_FIELDS: Final = {
     "Creator": "(nullmark-fixture-generator)",
     "Producer": "(nullmark-fixture-generator)",
     "CreationDate": "(D:20240101000000Z)",
@@ -379,7 +380,7 @@ def test_incremental_update_remnants_dropped(cli_binary: Path, tmp_path: Path) -
     )
 
 
-ASTRAL_TARGET = "OLD\U0001f600NAME"
+ASTRAL_TARGET: Final = "OLD\U0001f600NAME"
 
 
 @pytest.mark.parametrize("name", ["xmp", "info"])
@@ -553,7 +554,7 @@ def test_key_bearing_target_fails_closed(cli_binary: Path, tmp_path: Path) -> No
     )
 
 
-KITCHEN_SINK_SURFACE_COUNT = 9
+KITCHEN_SINK_SURFACE_COUNT: Final = 9
 
 
 def test_scrub_kitchen_sink_all_surfaces(cli_binary: Path, tmp_path: Path) -> None:

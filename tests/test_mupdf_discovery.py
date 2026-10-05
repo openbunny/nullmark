@@ -56,14 +56,12 @@ def test_discovers_via_brew_prefix_when_no_pkg_config(
 def test_discovers_intel_homebrew_fallback_when_apple_silicon_prefix_absent(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    # Reproduces the original bug: a hardcoded /opt/homebrew misses an Intel
-    # Mac, where mupdf lives under /usr/local instead.
     intel = tmp_path / "usr-local"
     _make_mupdf_tree(intel)
-    apple_silicon = tmp_path / "opt-homebrew"  # deliberately not created
+    absent_apple_silicon = tmp_path / "opt-homebrew"
 
     monkeypatch.setattr("mupdf_discovery.shutil.which", lambda _name: None)
-    monkeypatch.setattr(md, "_FALLBACK_PREFIXES", (apple_silicon, intel))
+    monkeypatch.setattr(md, "_FALLBACK_PREFIXES", (absent_apple_silicon, intel))
     assert md.discover_mupdf() == (intel / "include", intel / "lib")
 
 
@@ -78,9 +76,6 @@ def test_returns_none_when_mupdf_is_nowhere(
 def test_pkg_config_path_without_real_headers_is_not_trusted(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
-    # pkg-config can report a stale includedir (a moved or partially removed
-    # package); discovery must verify fitz.h actually exists there rather
-    # than trust the reported path blindly.
     stale = tmp_path / "stale"
     stale.mkdir()
 

@@ -1,7 +1,6 @@
 ; Seatbelt profile for the nullmark-cli entry point (CTask4PDF/task4pdf.c,
 ; #ifdef T4_MAIN). App.entitlements carries no App Sandbox entitlement (see
-; docs/standards/native-code.md and apps/nullmark/project.yml), so this is the
-; substitute containment for the CLI: t4_replace parses an untrusted,
+; project.yml), so this is the substitute containment for the CLI: t4_replace parses an untrusted,
 ; caller-supplied PDF through MuPDF, a large C parser with a history of
 ; memory-corruption CVEs, so a crafted PDF that gains code execution inside
 ; this process should not be able to reach the network or write outside the

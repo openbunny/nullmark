@@ -3,19 +3,19 @@
 # never stopping at the first. `just ci-check` installs dependencies first.
 #
 # Prerequisites, load-bearing for the recipes below:
-#   brew install mupdf   # CTask4PDF/task4pdf.c, verify-redaction.sh and
-#                         # tests/ all build and link against it
+#     mupdf      # CTask4PDF/task4pdf.c, verify-redaction.sh and tests/
+#                # all build and link against it
+#     cppcheck   # the `cppcheck` second-analyzer gate
+#     llvm       # test-san, fuzz and coverage need LeakSanitizer, libFuzzer
+#                # and llvm-cov; Apple's clang ships none of them on arm64
+#                # macOS, so they use the LLVM toolchain.
 #   Xcode 27.0, with `xcodegen` on PATH   # `build` generates and builds the
 #                                          # .xcodeproj from project.yml
-#   brew install cppcheck            # the `cppcheck` second-analyzer gate
-#   brew install llvm    # test-san, fuzz and coverage need LeakSanitizer,
-#                        # libFuzzer and llvm-cov; Apple's clang ships none of
-#                        # them on arm64 macOS, so they use the LLVM toolchain.
 #   mise install   # actionlint, gitleaks, just, ruff, shellcheck, swiftlint,
 #                   # xcodegen, zizmor and the rest of the pinned toolchain
 set shell := ["bash", "-uc"]
 
-# clang-format and clang-tidy ship in the Homebrew LLVM prefix, which is not on
+# clang-format and clang-tidy ship in the LLVM prefix, which is not on
 # PATH by default. Export it here so the fmt and lint gates resolve the same
 # tools locally and in CI, where no step can adjust PATH for the just call.
 export PATH := "/opt/homebrew/opt/llvm/bin:" + env('PATH')
@@ -41,7 +41,6 @@ ci-check: install
 
 install:
     mise install
-    brew bundle
     cd tests && uv sync --frozen
 
 # No runner here continues past a failing gate and reports every failure together.
@@ -106,16 +105,16 @@ cppcheck:
         --error-exitcode=2 \
         -I CTask4PDF/include -I /opt/homebrew/include CTask4PDF/task4pdf.c
 
-# Records the linked MuPDF's Homebrew version and the sha256 of the resolved
+# Records the linked MuPDF's installed version and the sha256 of the resolved
 # libmupdf.dylib into CTask4PDF/mupdf.lock. See README.md for why this pin
 # exists. Run after a reviewed MuPDF upgrade to move the pin forward.
 mupdf-lock:
     #!/usr/bin/env bash
     set -euo pipefail
-    test -e {{ mupdf_lib }} || { echo "mupdf-lock: {{ mupdf_lib }} not found; brew install mupdf" >&2; exit 1; }
+    test -e {{ mupdf_lib }} || { echo "mupdf-lock: {{ mupdf_lib }} not found" >&2; exit 1; }
     resolved="$(readlink -f {{ mupdf_lib }})"
     version="$(brew list --versions mupdf | awk '{print $2}')"
-    test -n "$version" || { echo "mupdf-lock: mupdf not installed via brew" >&2; exit 1; }
+    test -n "$version" || { echo "mupdf-lock: mupdf version unknown" >&2; exit 1; }
     sha="$(shasum -a 256 "$resolved" | awk '{print $1}')"
     printf 'version=%s\nsha256=%s\n' "$version" "$sha" > {{ mupdf_lock }}
     echo "mupdf-lock: recorded mupdf $version ($sha)"
@@ -130,7 +129,7 @@ mupdf-verify:
         echo "mupdf-verify: no {{ mupdf_lock }} recorded; run 'just mupdf-lock' to pin the linked MuPDF. Skipping." >&2
         exit 0
     fi
-    test -e {{ mupdf_lib }} || { echo "mupdf-verify: {{ mupdf_lib }} not found; brew install mupdf" >&2; exit 1; }
+    test -e {{ mupdf_lib }} || { echo "mupdf-verify: {{ mupdf_lib }} not found" >&2; exit 1; }
     resolved="$(readlink -f {{ mupdf_lib }})"
     version="$(brew list --versions mupdf | awk '{print $2}')"
     sha="$(shasum -a 256 "$resolved" | awk '{print $1}')"
@@ -204,7 +203,7 @@ cli:
 test-san:
     #!/usr/bin/env bash
     set -euo pipefail
-    test -x {{ llvm_bin }}/clang || { echo "test-san needs the LLVM toolchain: brew install llvm" >&2; exit 1; }
+    test -x {{ llvm_bin }}/clang || { echo "test-san needs the LLVM toolchain" >&2; exit 1; }
     sdk="$(xcrun --show-sdk-path)"
     work="$(mktemp -d "${TMPDIR:-/tmp}/nullmarksan.XXXXXX")"
     trap 'rm -rf "$work"' EXIT
@@ -244,7 +243,7 @@ test-san:
 fuzz:
     #!/usr/bin/env bash
     set -euo pipefail
-    test -x {{ llvm_bin }}/clang || { echo "fuzz needs the LLVM toolchain: brew install llvm" >&2; exit 1; }
+    test -x {{ llvm_bin }}/clang || { echo "fuzz needs the LLVM toolchain" >&2; exit 1; }
     corpus=CTask4PDF/fuzz/corpus
     test -n "$(ls -A "$corpus" 2>/dev/null)" || { echo "fuzz: seed corpus $corpus is empty" >&2; exit 1; }
     sdk="$(xcrun --show-sdk-path)"
@@ -279,7 +278,7 @@ fuzz:
 coverage:
     #!/usr/bin/env bash
     set -euo pipefail
-    test -x {{ llvm_bin }}/clang || { echo "coverage needs the LLVM toolchain: brew install llvm" >&2; exit 1; }
+    test -x {{ llvm_bin }}/clang || { echo "coverage needs the LLVM toolchain" >&2; exit 1; }
     sdk="$(xcrun --show-sdk-path)"
     work="$(mktemp -d "${TMPDIR:-/tmp}/nullmarkcov.XXXXXX")"
     trap 'rm -rf "$work"' EXIT

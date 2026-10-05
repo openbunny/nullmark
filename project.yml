@@ -2,7 +2,7 @@ name: Nullmark
 options:
   bundleIdPrefix: dev.openbunny.nullmark
   deploymentTarget:
-    macOS: "15.0"
+    macOS: "27.0"
   createIntermediateGroups: true
 configs:
   Debug: debug
@@ -16,13 +16,13 @@ packages:
     version: 0.1.1
 settings:
   base:
-    MACOSX_DEPLOYMENT_TARGET: "15.0"
+    MACOSX_DEPLOYMENT_TARGET: "27.0"
     SWIFT_VERSION: "6"
     SWIFT_STRICT_CONCURRENCY: complete
     OTHER_SWIFT_FLAGS: -strict-memory-safety
     SWIFT_TREAT_WARNINGS_AS_ERRORS: YES
     GCC_TREAT_WARNINGS_AS_ERRORS: YES
-    # MuPDF is a Homebrew-provided dylib (/opt/homebrew/lib), neither
+    # MuPDF is an externally provided dylib (/opt/homebrew/lib), neither
     # Apple-signed nor vendored into the bundle. ENABLE_HARDENED_RUNTIME: NO
     # because hardened runtime's library validation refuses to load a dylib
     # not signed with the app's own Team ID. App.entitlements carries no

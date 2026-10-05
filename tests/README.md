@@ -5,14 +5,11 @@ Tests for `t4_replace` in `../CTask4PDF/task4pdf.c`, run against the standalone
 
 ## Prerequisite
 
-MuPDF, from Homebrew:
-
-```sh
-brew install mupdf
-```
+MuPDF must be installed as a workstation tool, with its headers,
+library, and `mutool` available.
 
 `test_redactor.py` locates MuPDF's headers and libraries via `pkg-config`,
-then `brew --prefix mupdf`, then the two conventional Homebrew prefixes
+then `brew --prefix mupdf`, then the two conventional prefixes
 (`mupdf_discovery.py`), and also needs a `cc` and `mutool` on `PATH`. If none
 of that is found, the whole module is skipped at collection time with a
 message naming what is missing — it does not fail, unless `NULLMARK_REQUIRE_MUPDF`

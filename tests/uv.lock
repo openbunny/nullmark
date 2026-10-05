@@ -399,8 +399,8 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "fonttools", specifier = "==4.65.0" },
-    { name = "hypothesis" },
-    { name = "mypy" },
+    { name = "hypothesis", specifier = "==6.168.4" },
+    { name = "mypy", specifier = "==2.4.0" },
     { name = "pytest", specifier = "==9.1.1" },
 ]
 

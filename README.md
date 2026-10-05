@@ -90,11 +90,8 @@ the export does not carry a record of the machine that produced it.
 
 ## Dependency
 
-MuPDF is required and provided by Homebrew:
-
-```sh
-brew install mupdf
-```
+MuPDF, LLVM (clang-format, clang-tidy), and cppcheck are required
+workstation tools. This project carries no Brewfile.
 
 `project.yml` links `-lmupdf` and searches `/opt/homebrew/{include,lib}`.
 MuPDF is AGPL: distributing this app beyond personal use requires either
@@ -103,13 +100,13 @@ licence.
 
 ### MuPDF version pin
 
-A Homebrew dependency is normally named by its install command, not a
+A workstation dependency is normally named by its install command, not a
 transcribed version, because a written number goes stale silently and
-Renovate does not track Homebrew formulae. This dependency is the deliberate
+Renovate does not track it. This dependency is the deliberate
 exception: MuPDF parses attacker-supplied PDF input, so an unreviewed
-Homebrew upgrade — pulling in a MuPDF version whose own CVE fixes or
+upgrade — pulling in a MuPDF version whose own CVE fixes or
 regressions were never looked at — is exactly the exposure nullmark exists to
-avoid introducing elsewhere. `CTask4PDF/mupdf.lock` records the Homebrew
+avoid introducing elsewhere. `CTask4PDF/mupdf.lock` records the installed
 `mupdf` version and the sha256 of the resolved `libmupdf.dylib` the last
 reviewed build linked; `just mupdf-verify` (wired into `just check`) fails
 the gate if the linked library's version or hash has since drifted.
@@ -127,8 +124,8 @@ just mupdf-lock
 The app does not adopt App Sandbox (no `com.apple.security.app-sandbox` in
 `App.entitlements`) and disables the hardened runtime
 (`ENABLE_HARDENED_RUNTIME: NO` in `project.yml`). Both are dropped for the same
-root cause: `libmupdf.dylib` comes from Homebrew (`/opt/homebrew/lib`), is
-neither Apple-signed nor vendored into the bundle, and:
+root cause: `libmupdf.dylib` lives outside the bundle (`/opt/homebrew/lib`),
+is neither Apple-signed nor vendored into it, and:
 
 - the hardened runtime's library validation refuses to load a dylib not signed
   with the app's own Team ID;
