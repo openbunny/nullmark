@@ -407,20 +407,23 @@ tracked-outputs:
 
 # No design token literal outside the theme package: no DS namespace, no hex
 # colour, no inline Color/Font constructors in App/; the icon SVG uses only
-# OpenBunny token colours and the committed icon set is complete.
+# OpenBunny token colours and the in-app mark is the icon's own glyph.
 theme-check:
     #!/usr/bin/env bash
     set -euo pipefail
     swift_files=$(git ls-files 'App/*.swift' 'App/**/*.swift')
     test -n "$swift_files"
     bad=""
-    if echo "$swift_files" | xargs grep -nE 'DS\.|#[0-9a-fA-F]{3,}|Color\(\.|Font\.(system|custom)' | grep -v 'Color\.clear'; then
+    if echo "$swift_files" | xargs grep -nE 'DS\.|#[0-9a-fA-F]{3,}|Color\(\.|Font\.(system|custom)|\.font\(\.(system|custom)\(' | grep -v 'Color\.clear'; then
         echo "theme-check: design token literal outside the theme package" >&2
         bad=1
     fi
-    grep -qIE 'f2c6d9|100e14|f7f2ef|9a93a3' App/Assets/AppIcon.svg && {
-        echo "theme-check: AppIcon.svg still carries origin colours" >&2
+    grep -qIE 'f2c6d9|100e14|f7f2ef|9a93a3' App/Assets/AppIcon.icon/icon.json App/Assets/AppIcon.icon/Assets/zero.svg && {
+        echo "theme-check: the app icon still carries origin colours" >&2
         bad=1
     } || true
-    test -f App/Assets.xcassets/AppIcon.appiconset/Contents.json
+    cmp -s App/Assets/AppIcon.icon/Assets/zero.svg App/Assets.xcassets/NullmarkMark.imageset/zero.svg || {
+        echo "theme-check: NullmarkMark.imageset/zero.svg differs from the app icon's glyph" >&2
+        bad=1
+    }
     test -z "$bad"

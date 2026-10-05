@@ -125,9 +125,9 @@ struct ContentView: View {
         .overlay(alignment: .topTrailing) {
           Group {
             if model.edited {
-              Tag(text: "edited")
+              Tag(text: "Edited")
             } else {
-              Tag(text: "original", tint: Color.muted)
+              Tag(text: "Original", tint: Color.muted)
             }
           }
           .padding(Spacing.base)
@@ -260,10 +260,10 @@ private struct Header: View {
           RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
             .strokeBorder(Color.border, lineWidth: Metric.borderWidth))
       VStack(alignment: .leading, spacing: 2) {
-        Text("nullmark")
+        Text("Nullmark")
           .font(.themeBody.weight(.bold))
           .foregroundStyle(Color.foreground)
-        Text("replace text in pdfs, verify nothing survives")
+        Text("Replace text in PDFs, verify nothing survives")
           .font(.themeCaption)
           .foregroundStyle(Color.muted)
       }
@@ -272,17 +272,11 @@ private struct Header: View {
 }
 
 struct NullmarkMark: View {
-  private static let glyphToSide = 5.0 / 6.0
-
   var body: some View {
-    GeometryReader { proxy in
-      let side = min(proxy.size.width, proxy.size.height)
-      Text("0")
-        .font(.custom(FontFamily.mono, fixedSize: side * Self.glyphToSide).weight(.bold))
-        .foregroundStyle(Color.foreground)
-        .frame(width: side, height: side)
-        .position(x: proxy.size.width / 2, y: proxy.size.height / 2)
-    }
+    Image("NullmarkMark")
+      .resizable()
+      .scaledToFit()
+      .foregroundStyle(Color.foreground)
   }
 }
 

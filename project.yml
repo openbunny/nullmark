@@ -45,6 +45,7 @@ targets:
       - path: App/Sources
       - path: CTask4PDF/task4pdf.c
       - path: App/Assets.xcassets
+      - path: App/Assets/AppIcon.icon
     dependencies:
       - package: OpenBunnyTheme
         product: OpenBunnyTheme
