@@ -4,6 +4,14 @@ import SwiftUI
 
 @main
 struct NullmarkApp: App {
+  init() {
+    do {
+      try Fonts.register()
+    } catch {
+      print("NullmarkApp: font registration failed: \(error.localizedDescription)")
+    }
+  }
+
   var body: some Scene {
     WindowGroup {
       ContentView()

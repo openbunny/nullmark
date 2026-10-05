@@ -72,9 +72,12 @@ struct CommandLine: View {
 
   var body: some View {
     HStack(alignment: .center, spacing: Spacing.base) {
-      (Text("$ ").foregroundStyle(Color.muted) + tokenText)
-        .font(.themeMono)
-        .frame(maxWidth: .infinity, alignment: .leading)
+      HStack(spacing: 0) {
+        Text("$ ").foregroundStyle(Color.muted)
+        tokenText
+      }
+      .font(.themeMono)
+      .frame(maxWidth: .infinity, alignment: .leading)
       CopyButton(
         text: command, label: copyLabel ?? "Copy command: \(command)")
     }
@@ -87,19 +90,22 @@ struct CommandLine: View {
   }
 
   private var tokenText: Text {
-    shellTokens(command).reduce(Text("")) { result, token in
-      let styled: Text
-      switch token.kind {
-      case .command:
-        styled = Text(token.text).bold().foregroundStyle(Color.foreground)
-      case .flag:
-        styled = Text(token.text).foregroundStyle(Color.muted)
-      case .string:
-        styled = Text(token.text).foregroundStyle(Color.sprout)
-      case .text:
-        styled = Text(token.text).foregroundStyle(Color.foreground)
-      }
-      return result + styled
+    shellTokens(command).reduce(Text("")) { partial, token in
+      Text("\(partial)\(style(token))")
+    }
+  }
+
+  private func style(_ token: ShellToken) -> Text {
+    let base = Text(token.text)
+    switch token.kind {
+    case .command:
+      return base.bold().foregroundStyle(Color.foreground)
+    case .flag:
+      return base.foregroundStyle(Color.muted)
+    case .string:
+      return base.foregroundStyle(Color.sprout)
+    case .text:
+      return base.foregroundStyle(Color.foreground)
     }
   }
 }

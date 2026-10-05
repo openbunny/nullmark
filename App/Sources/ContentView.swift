@@ -272,24 +272,16 @@ private struct Header: View {
 }
 
 struct NullmarkMark: View {
+  private static let glyphToSide = 5.0 / 6.0
+
   var body: some View {
     GeometryReader { proxy in
       let side = min(proxy.size.width, proxy.size.height)
-      let unit = side / 1024
-      ZStack {
-        RoundedRectangle(
-          cornerRadius: 40 * unit, style: .continuous
-        )
-        .stroke(Color.foreground, lineWidth: 24 * unit)
-        .frame(width: 400 * unit, height: 640 * unit)
-        .position(x: side / 2, y: side / 2)
-        Rectangle()
-          .fill(Color.sproutFill)
-          .frame(width: 400 * unit, height: 96 * unit)
-          .position(x: side / 2, y: side / 2)
-      }
-      .frame(width: side, height: side)
-      .position(x: proxy.size.width / 2, y: proxy.size.height / 2)
+      Text("0")
+        .font(.custom(FontFamily.mono, fixedSize: side * Self.glyphToSide).weight(.bold))
+        .foregroundStyle(Color.foreground)
+        .frame(width: side, height: side)
+        .position(x: proxy.size.width / 2, y: proxy.size.height / 2)
     }
   }
 }
