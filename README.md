@@ -111,9 +111,8 @@ avoid introducing elsewhere. `CTask4PDF/mupdf.lock` records the installed
 reviewed build linked; `just mupdf-verify` (wired into `just check`) fails
 the gate if the linked library's version or hash has since drifted.
 
-A fresh checkout with no `mupdf.lock` yet is not blocked: `mupdf-verify`
-prints a notice and passes. After reviewing a MuPDF upgrade for its CVE
-delta, move the pin forward with:
+A missing `mupdf.lock` also fails the gate. After reviewing a MuPDF upgrade
+for its CVE delta, move the pin forward with:
 
 ```sh
 just mupdf-lock
