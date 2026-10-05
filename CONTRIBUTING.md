@@ -6,7 +6,9 @@ How to submit a change to an OpenBunny repository.
 
 ## Development
 
-- Use the toolchain declared by the repository.
+- Use the toolchain declared by the repository. `just install` installs it and
+  the git hooks in `lefthook.yml`: `fmt-check`, `lint`, `typecheck` and
+  `secrets` run before each commit, `just check` before each push.
 - Run `just check` before opening a pull request.
 - Add tests for behaviour added or fixed, using local substitutes for devices,
   accounts, and network peers.

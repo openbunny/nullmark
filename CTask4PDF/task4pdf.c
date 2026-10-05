@@ -447,13 +447,20 @@ static int scrub_container(fz_context *ctx, pdf_obj *obj, const char *find, cons
     if (pdf_is_dict(ctx, obj)) {
         int n = pdf_dict_len(ctx, obj);
         for (int i = 0; i < n; i++) {
+            pdf_obj *key = pdf_dict_get_key(ctx, obj, i);
             pdf_obj *val = pdf_dict_get_val(ctx, obj, i);
-            if (pdf_is_indirect(ctx, val)) {
+            // An /ID array is the opaque digest pair a cross-reference stream
+            // dict carries in place of a trailer. It is not text: decoding it
+            // refuses any digest holding a 0x00 byte. count_id_needles reads
+            // it raw during verification, so a target inside it still fails
+            // closed.
+            if (pdf_is_indirect(ctx, val) ||
+                (pdf_name_eq(ctx, key, PDF_NAME(ID)) && pdf_is_array(ctx, val))) {
                 continue;
             }
             pdf_obj *nw = scrub_value(ctx, val, find, repl);
             if (nw != NULL) {
-                pdf_dict_put_drop(ctx, obj, pdf_dict_get_key(ctx, obj, i), nw);
+                pdf_dict_put_drop(ctx, obj, key, nw);
                 changed++;
             } else if (pdf_is_dict(ctx, val) || pdf_is_array(ctx, val)) {
                 changed += scrub_container(ctx, val, find, repl, depth + 1);

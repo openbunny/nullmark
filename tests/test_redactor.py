@@ -17,6 +17,7 @@ from fixtures.generate import (
     build_cidfont,
     build_deep_nesting,
     build_incremental_update,
+    build_info_only,
     build_key_only,
     build_kitchen_sink,
     build_nul_name_only,
@@ -514,6 +515,45 @@ def test_nul_escaped_name_scrubs_clean(cli_binary: Path, tmp_path: Path) -> None
         "NUL-escaped name target survives in raw output"
     )
     assert REPLACEMENT.encode() in raw_out, "replacement missing from raw output"
+
+
+NUL_LEADING_ID: Final = "00" + "a5" * 15
+_TRAILER_ID_RE: Final = re.compile(
+    rb"/ID\s*\[\s*<[0-9A-Fa-f]{32}>\s*<[0-9A-Fa-f]{32}>\s*\]"
+)
+
+
+def test_xref_stream_id_with_nul_byte_scrubs_clean(
+    cli_binary: Path, tmp_path: Path
+) -> None:
+    classic = tmp_path / "classic.pdf"
+    build_info_only(classic, TARGET)
+    original = classic.read_bytes()
+    pinned = _TRAILER_ID_RE.sub(
+        f"/ID [<{NUL_LEADING_ID}> <{NUL_LEADING_ID}>]".encode(), original
+    )
+    assert pinned != original, "fixture setup: trailer /ID not found"
+    classic.write_bytes(pinned)
+    in_pdf = tmp_path / "xrefstm.pdf"
+    subprocess.run(
+        ["mutool", "clean", "-Z", str(classic), str(in_pdf)],
+        check=True,
+        capture_output=True,
+    )
+    assert b"/XRef" in in_pdf.read_bytes(), "fixture setup: no cross-reference stream"
+    out_pdf = tmp_path / "xrefstm.out.pdf"
+    result = _run_cli(cli_binary, in_pdf, out_pdf)
+    fields = _result_fields(result.stdout)
+    assert fields["rc"] == 0, (
+        f"NUL-bearing /ID digest refused; stdout={result.stdout!r}"
+    )
+    assert fields["residual"] == 0, f"residual not zero; stdout={result.stdout!r}"
+    assert TARGET not in _clean(out_pdf, tmp_path / "xrefstm.clean.pdf"), (
+        "target survives in output"
+    )
+    assert NUL_LEADING_ID.encode() in out_pdf.read_bytes().lower(), (
+        "/ID digest not preserved"
+    )
 
 
 def test_trailer_junk_scrubs_clean(cli_binary: Path, tmp_path: Path) -> None:
