@@ -187,33 +187,36 @@ static int collect_matches(fz_context *ctx, const fz_stext_page *stext, const in
 static void draw_replacement(fz_context *ctx, fz_device *dev, const char *replacement,
                              fz_font *font, float size, fz_point origin, uint32_t argb) {
     fz_text *text = fz_new_text(ctx);
-    fz_matrix trm = fz_make_matrix(size, 0, 0, -size, origin.x, origin.y);
-    const char *p = replacement;
-    while (*p) {
-        int c;
-        p += fz_chartorune(&c, p);
-        fz_font *gf = font;
-        int gid = font ? fz_encode_character(ctx, font, c) : 0;
-        if (gid <= 0) {
-            gf = NULL;
-            gid = fz_encode_character_with_fallback(ctx, font, c, 0, 0, &gf);
+    fz_try(ctx) {
+        fz_matrix trm = fz_make_matrix(size, 0, 0, -size, origin.x, origin.y);
+        const char *p = replacement;
+        while (*p) {
+            int c;
+            p += fz_chartorune(&c, p);
+            fz_font *gf = font;
+            int gid = font ? fz_encode_character(ctx, font, c) : 0;
+            if (gid <= 0) {
+                gf = NULL;
+                gid = fz_encode_character_with_fallback(ctx, font, c, 0, 0, &gf);
+            }
+            if (!gf) {
+                gf = font;
+                gid = fz_encode_character(ctx, gf, c);
+            }
+            fz_show_glyph(ctx, text, gf, trm, gid, c, 0, 0, FZ_BIDI_LTR, FZ_LANG_UNSET);
+            float adv = fz_advance_glyph(ctx, gf, gid, 0);
+            trm = fz_pre_translate(trm, adv, 0);
         }
-        if (!gf) {
-            gf = font;
-            gid = fz_encode_character(ctx, gf, c);
-        }
-        fz_show_glyph(ctx, text, gf, trm, gid, c, 0, 0, FZ_BIDI_LTR, FZ_LANG_UNSET);
-        float adv = fz_advance_glyph(ctx, gf, gid, 0);
-        trm = fz_pre_translate(trm, adv, 0);
+        const float rgb[3] = {
+            (float)((argb >> (unsigned)CHANNEL_SHIFT_R) & (unsigned)CHANNEL_MASK) / CHANNEL_MAX,
+            (float)((argb >> (unsigned)CHANNEL_SHIFT_G) & (unsigned)CHANNEL_MASK) / CHANNEL_MAX,
+            (float)(argb & (unsigned)CHANNEL_MASK) / CHANNEL_MAX,
+        };
+        fz_fill_text(ctx, dev, text, fz_identity, fz_device_rgb(ctx), rgb, 1.0f,
+                     fz_default_color_params);
     }
-    const float rgb[3] = {
-        (float)((argb >> (unsigned)CHANNEL_SHIFT_R) & (unsigned)CHANNEL_MASK) / CHANNEL_MAX,
-        (float)((argb >> (unsigned)CHANNEL_SHIFT_G) & (unsigned)CHANNEL_MASK) / CHANNEL_MAX,
-        (float)(argb & (unsigned)CHANNEL_MASK) / CHANNEL_MAX,
-    };
-    fz_fill_text(ctx, dev, text, fz_identity, fz_device_rgb(ctx), rgb, 1.0f,
-                 fz_default_color_params);
-    fz_drop_text(ctx, text);
+    fz_always(ctx) { fz_drop_text(ctx, text); }
+    fz_catch(ctx) { fz_rethrow(ctx); }
 }
 
 // A form XObject keeps the replacement's font resources from colliding with
