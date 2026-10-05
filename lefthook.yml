@@ -1,17 +1,12 @@
 pre-commit:
   parallel: true
   commands:
-    format:
-      run: just format
-    editorconfig:
-      run: just editorconfig
-    swift-format:
-      glob: "*.swift"
-      run: just swift-format
+    fmt-check:
+      run: just fmt-check
     secrets:
       run: just secrets
 
 pre-push:
   commands:
-    ts:
-      run: just lint typecheck test knip cspell
+    check:
+      run: just check

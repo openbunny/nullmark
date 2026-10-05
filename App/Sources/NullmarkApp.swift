@@ -1,6 +1,7 @@
 import OpenBunnyTheme
 import OpenBunnyUI
 import SwiftUI
+import os
 
 @main
 struct NullmarkApp: App {
@@ -8,7 +9,9 @@ struct NullmarkApp: App {
     do {
       try Fonts.register()
     } catch {
-      print("NullmarkApp: font registration failed: \(error.localizedDescription)")
+      Logger(subsystem: "dev.openbunny.nullmark", category: "fonts").error(
+        "Font registration failed, using system fonts: \(error.localizedDescription, privacy: .public)"
+      )
     }
   }
 
