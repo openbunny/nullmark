@@ -7,6 +7,12 @@ version = "1.7.12"
 backend = "aqua:rhysd/actionlint"
 specifiers = ["1.7.12"]
 
+[tools.actionlint."platforms.linux-arm64"]
+checksum = "sha256:325e971b6ba9bfa504672e29be93c24981eeb1c07576d730e9f7c8805afff0c6"
+url = "https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_arm64.tar.gz"
+url_api = "https://api.github.com/repos/rhysd/actionlint/releases/assets/384924897"
+provenance = "github-attestations"
+
 [tools.actionlint."platforms.linux-arm64-musl"]
 checksum = "sha256:325e971b6ba9bfa504672e29be93c24981eeb1c07576d730e9f7c8805afff0c6"
 url = "https://github.com/rhysd/actionlint/releases/download/v1.7.12/actionlint_1.7.12_linux_arm64.tar.gz"
@@ -123,10 +129,51 @@ checksum = "sha256:759f16fb7aa17c5c8b9594b6d4a8c1a6630dfd042cf2b3ff84841454d3d18
 url = "https://github.com/casey/just/releases/download/1.58.0/just-1.58.0-x86_64-pc-windows-msvc.zip"
 url_api = "https://api.github.com/repos/casey/just/releases/assets/500511374"
 
+[[tools.osv-scanner]]
+version = "2.6.0"
+backend = "aqua:google/osv-scanner"
+specifiers = ["2.6.0"]
+
+[tools.osv-scanner."platforms.linux-arm64"]
+checksum = "sha256:2c71403eb443d05891c4f268c3ad771cf4f16e5443463fd7851ef8f454d3c7e4"
+url = "https://github.com/google/osv-scanner/releases/download/v2.6.0/osv-scanner_linux_arm64"
+url_api = "https://api.github.com/repos/google/osv-scanner/releases/assets/562414650"
+
+[tools.osv-scanner."platforms.linux-arm64-musl"]
+checksum = "sha256:2c71403eb443d05891c4f268c3ad771cf4f16e5443463fd7851ef8f454d3c7e4"
+url = "https://github.com/google/osv-scanner/releases/download/v2.6.0/osv-scanner_linux_arm64"
+url_api = "https://api.github.com/repos/google/osv-scanner/releases/assets/562414650"
+
+[tools.osv-scanner."platforms.linux-x64"]
+checksum = "sha256:ca69b3d3cd08f889a49dc0a383122f71cc528b83803671df5fd874d97485b108"
+url = "https://github.com/google/osv-scanner/releases/download/v2.6.0/osv-scanner_linux_amd64"
+url_api = "https://api.github.com/repos/google/osv-scanner/releases/assets/562414718"
+
+[tools.osv-scanner."platforms.linux-x64-musl"]
+checksum = "sha256:ca69b3d3cd08f889a49dc0a383122f71cc528b83803671df5fd874d97485b108"
+url = "https://github.com/google/osv-scanner/releases/download/v2.6.0/osv-scanner_linux_amd64"
+url_api = "https://api.github.com/repos/google/osv-scanner/releases/assets/562414718"
+
+[tools.osv-scanner."platforms.macos-arm64"]
+checksum = "sha256:98c460dcd37de25819babd757d04542045b6243113e209edcd4d89fedb0256b4"
+url = "https://github.com/google/osv-scanner/releases/download/v2.6.0/osv-scanner_darwin_arm64"
+url_api = "https://api.github.com/repos/google/osv-scanner/releases/assets/562414648"
+
+[tools.osv-scanner."platforms.macos-x64"]
+checksum = "sha256:60c5296637e977b28eeda5c7f13573e447659a632922737f94d11fa7e30ad6ca"
+url = "https://github.com/google/osv-scanner/releases/download/v2.6.0/osv-scanner_darwin_amd64"
+url_api = "https://api.github.com/repos/google/osv-scanner/releases/assets/562414712"
+
+[tools.osv-scanner."platforms.windows-x64"]
+checksum = "sha256:e0ed7644118b717b028c249ee9d3515024e55e8510747ca08906eb96765354d6"
+url = "https://github.com/google/osv-scanner/releases/download/v2.6.0/osv-scanner_windows_amd64.exe"
+url_api = "https://api.github.com/repos/google/osv-scanner/releases/assets/562414649"
+
 [[tools."pipx:reuse"]]
 version = "6.2.0"
 backend = "pipx:reuse"
 specifiers = ["6.2.0"]
+uv = { path = ".mise/locks/pipx-reuse/6.2.0~068c1fb0", digest = "sha256:0b246db0850e20d9957788df4141e1b4cb886d1811c9cf93c1c5f1df613ecc09" }
 
 [tools."pipx:reuse".options]
 extras = "charset-normalizer"
@@ -180,6 +227,18 @@ specifiers = ["0.16.10"]
 checksum = "sha256:dc0d74de837ef0a7bcc62ce98c48a622b075d057161f13b958be2934becd55a6"
 url = "https://github.com/astral-sh/ruff/releases/download/0.16.10/ruff-aarch64-unknown-linux-gnu.tar.gz"
 url_api = "https://api.github.com/repos/astral-sh/ruff/releases/assets/603826868"
+provenance = "github-attestations"
+
+[tools.ruff."platforms.linux-arm64-musl"]
+checksum = "sha256:38ebc0ec3e0de538d1c399729ca04e124749211d66aa134c24ad0c1f09a935b9"
+url = "https://github.com/astral-sh/ruff/releases/download/0.16.10/ruff-aarch64-unknown-linux-musl.tar.gz"
+url_api = "https://api.github.com/repos/astral-sh/ruff/releases/assets/603826873"
+provenance = "github-attestations"
+
+[tools.ruff."platforms.linux-x64"]
+checksum = "sha256:9567ff1201e2fb3da31ff04c35587d768c66d6cb42dfa84de474e2bfe360b608"
+url = "https://github.com/astral-sh/ruff/releases/download/0.16.10/ruff-x86_64-unknown-linux-gnu.tar.gz"
+url_api = "https://api.github.com/repos/astral-sh/ruff/releases/assets/603827060"
 provenance = "github-attestations"
 
 [tools.ruff."platforms.linux-x64-musl"]
@@ -322,6 +381,12 @@ url = "https://github.com/astral-sh/uv/releases/download/0.12.21/uv-x86_64-apple
 url_api = "https://api.github.com/repos/astral-sh/uv/releases/assets/599237993"
 provenance = "github-attestations"
 
+[tools.uv."platforms.windows-x64"]
+checksum = "sha256:5d223efa0bf00208c3853246af09420419dfbd352536aa6bb8163d6170e23890"
+url = "https://github.com/astral-sh/uv/releases/download/0.12.21/uv-x86_64-pc-windows-msvc.zip"
+url_api = "https://api.github.com/repos/astral-sh/uv/releases/assets/599238008"
+provenance = "github-attestations"
+
 [[tools.xcodegen]]
 version = "2.46.0"
 backend = "aqua:yonaskolb/XcodeGen"
@@ -364,4 +429,22 @@ provenance = "github-attestations"
 checksum = "sha256:e65324f4430c2717591937edcec90ccbefaf14c174f8ec9415e03ca875b46e1a"
 url = "https://github.com/zizmorcore/zizmor/releases/download/v1.30.1/zizmor-x86_64-unknown-linux-gnu.tar.gz"
 url_api = "https://api.github.com/repos/zizmorcore/zizmor/releases/assets/552067642"
+provenance = "github-attestations"
+
+[tools.zizmor."platforms.macos-arm64"]
+checksum = "sha256:e28d22b087f9ebb8d99da6e740d348c930f559961c7c3f12badda54f882195a2"
+url = "https://github.com/zizmorcore/zizmor/releases/download/v1.30.1/zizmor-aarch64-apple-darwin.tar.gz"
+url_api = "https://api.github.com/repos/zizmorcore/zizmor/releases/assets/552067640"
+provenance = "github-attestations"
+
+[tools.zizmor."platforms.macos-x64"]
+checksum = "sha256:10e6b18b11ea07e515a16f0f0518c7b07527bc9977c1fd5698181ce7f3554202"
+url = "https://github.com/zizmorcore/zizmor/releases/download/v1.30.1/zizmor-x86_64-apple-darwin.tar.gz"
+url_api = "https://api.github.com/repos/zizmorcore/zizmor/releases/assets/552067641"
+provenance = "github-attestations"
+
+[tools.zizmor."platforms.windows-x64"]
+checksum = "sha256:b183b1e996eddfab9659f1e9b46e059f1ef1cf984a1f14e5da09f7876a4b3a1c"
+url = "https://github.com/zizmorcore/zizmor/releases/download/v1.30.1/zizmor-x86_64-pc-windows-msvc.zip"
+url_api = "https://api.github.com/repos/zizmorcore/zizmor/releases/assets/552067645"
 provenance = "github-attestations"

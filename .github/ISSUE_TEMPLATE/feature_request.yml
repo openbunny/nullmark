@@ -1,0 +1,46 @@
+name: Feature request
+description: Suggest a behaviour
+title: "[feature]: "
+labels: ["type/feature", "status/needs-triage"]
+body:
+  - type: dropdown
+    id: component
+    attributes:
+      label: Component
+      description: The part of nullmark the request affects.
+      options:
+        - SwiftUI app (App/Sources)
+        - Redaction core (CTask4PDF)
+        - Export and filesystem metadata
+        - Build, toolchain, or install
+        - New component
+    validations:
+      required: true
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: The task that is hard or impossible today.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: The behaviour you want and how it would be invoked.
+    validations:
+      required: true
+  - type: textarea
+    id: surfaces
+    attributes:
+      label: Surfaces
+      description: "Which PDF surfaces the change must cover: page text, Info dictionary, XMP, outlines, annotations, form fields, or filesystem metadata."
+    validations:
+      required: false
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives
+      description: Other approaches you considered.
+    validations:
+      required: false
