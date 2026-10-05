@@ -1,11 +1,25 @@
 included:
   - App
   - AppTests
+opt_in_rules:
+  - all
 disabled_rules:
-  - prefer_nimble
-# swift-format adds a trailing comma to every multiline collection literal and
-# fmt-check enforces its output, so the linter must require the same form:
-# SwiftLint 0.65 changed this rule's default to forbid them, which no
-# formatted file can satisfy.
+  # Each rule below conflicts with swift-format's output, which fmt-check
+  # enforces, or with a rule in languages/swift.md.
+  - contrasted_opening_brace # swift-format places an opening brace on the line it opens.
+  - explicit_acl # swift.md: module access is the default.
+  - explicit_top_level_acl # swift.md: module access is the default.
+  - explicit_type_interface # swift.md: types are inferred where the compiler can.
+  - multiline_arguments_brackets # swift-format keeps a closing bracket on the last argument's line.
+  - one_declaration_per_file # a private helper view would have to widen its access to move.
+  - prefixed_toplevel_constant # swift.md: constants use lowerCamelCase, with no `k` prefix.
+  - required_deinit # swift.md: no boilerplate that adds no invariant.
+  - sorted_imports # swift-format orders imports by byte value, so `os` follows `SwiftUI`.
+file_types_order:
+  order: [main_type, supporting_type, extension, preview_provider, library_content_provider]
+indentation_width:
+  indentation_width: 2
+# swift-format adds a trailing comma to every multiline collection literal, so
+# the linter requires the same form.
 trailing_comma:
   mandatory_comma: true
