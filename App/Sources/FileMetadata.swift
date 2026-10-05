@@ -111,7 +111,9 @@ struct FileMetadata: Equatable {
     var target = url
     try target.setResourceValues(values)
     for name in Self.osAddedAttributes where extendedAttributes[name] == nil {
-      _ = unsafe removexattr(url.path, name, XATTR_NOFOLLOW)
+      if unsafe removexattr(url.path, name, XATTR_NOFOLLOW) != 0, errno != ENOATTR {
+        refused.append("\(name) removal (\(unsafe String(cString: strerror(errno))))")
+      }
     }
     return refused
   }

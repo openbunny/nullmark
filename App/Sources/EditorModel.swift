@@ -53,9 +53,9 @@ final class EditorModel {
   var replaceText = ""
 
   private var data: Data?
-  private var applyGeneration = 0
+  private var generation = 0
 
-  var byteCount: Int { data?.count ?? 0 }
+  var byteCount: Int? { data?.count }
 
   nonisolated private static func read(_ url: URL) throws -> Loaded {
     let meta = try FileMetadata(url: url)
@@ -120,9 +120,15 @@ final class EditorModel {
   }
 
   func load(_ url: URL) {
+    generation += 1
+    let ticket = generation
+    isApplying = false
     Task {
       do {
         let loaded = try await Task.detached { try Self.read(url) }.value
+        guard ticket == self.generation else {
+          return
+        }
         guard let pdf = PDFDocument(data: loaded.data) else {
           self.status = .failure("\(url.lastPathComponent) is not a readable PDF.")
           return
@@ -141,6 +147,9 @@ final class EditorModel {
         self.edited = false
         self.status = .info("Metadata captured. Enter the text to replace.")
       } catch {
+        guard ticket == self.generation else {
+          return
+        }
         self.status = .failure(
           "\(url.lastPathComponent) could not be read: \(error.localizedDescription)")
       }
@@ -157,21 +166,21 @@ final class EditorModel {
     }
     let find = findText
     let replacement = replaceText
-    applyGeneration += 1
-    let generation = applyGeneration
+    generation += 1
+    let ticket = generation
     isApplying = true
     Task {
       do {
         let outcome = try await Task.detached {
           try Self.replace(data: data, find: find, replace: replacement)
         }.value
-        guard generation == self.applyGeneration else {
+        guard ticket == self.generation else {
           return
         }
         isApplying = false
         self.acceptApplyOutcome(outcome, find: find)
       } catch {
-        guard generation == self.applyGeneration else {
+        guard ticket == self.generation else {
           return
         }
         isApplying = false
@@ -218,10 +227,12 @@ final class EditorModel {
           try Self.write(data: data, metadata: fileMetadata, to: url)
         }.value
         if diff.refused.isEmpty, diff.differences.isEmpty {
+          let count = fileMetadata.extendedAttributes.count
+          let attributes = "\(count) extended attribute\(count == 1 ? "" : "s")"
           self.status = .success(
             """
             Saved \(url.lastPathComponent). File dates, permissions and \
-            \(fileMetadata.extendedAttributes.count) extended attributes verified identical.
+            \(attributes) verified identical.
             """
           )
         } else {

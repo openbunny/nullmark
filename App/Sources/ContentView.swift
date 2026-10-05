@@ -161,7 +161,9 @@ struct ContentView: View {
 
   private func fileSummary(url: URL, document: PDFDocument) -> some View {
     let pages = "\(document.pageCount) page\(document.pageCount == 1 ? "" : "s")"
-    let size = ByteCountFormatter.string(fromByteCount: Int64(model.byteCount), countStyle: .file)
+    let size = model.byteCount.map { bytes in
+      ByteCountFormatter.string(fromByteCount: Int64(bytes), countStyle: .file)
+    }
     return VStack(alignment: .leading, spacing: Spacing.base) {
       HStack(spacing: Spacing.base) {
         Image(systemName: "doc.richtext.fill")
@@ -174,7 +176,7 @@ struct ContentView: View {
             .foregroundStyle(Color.foreground)
             .lineLimit(1)
             .truncationMode(.middle)
-          Text("\(pages) · \(size)")
+          Text([pages, size].compactMap(\.self).joined(separator: " · "))
             .font(.themeCaption)
             .foregroundStyle(Color.muted)
         }
