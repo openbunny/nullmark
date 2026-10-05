@@ -1,14 +1,14 @@
 # Nullmark
 
 A local macOS app that removes a target string from a PDF and verifies its
-absence across every surface. Its purpose is to let someone remove a deadname
-from their own documents after a legal name change: the old text is removed
-from the page and from the document metadata, the new text is drawn or
-substituted in its place, and the output carries no record that a rewrite tool
-touched the file — no second `%%EOF`, no `/Prev`, no engine version string.
-Only occurrences of the target change; every other field keeps the same
-content it had. That is a field-level guarantee, not whole-file byte
-identity — see "What preservation means at the byte level" below.
+absence across every surface. It exists to remove a deadname from a person's
+own documents after a legal name change: the old text is removed from the page
+and from the document metadata, the new text is drawn or substituted in its
+place, and the output carries no record that a rewrite tool touched the file —
+no second `%%EOF`, no `/Prev`, no engine version string. Only occurrences of
+the target change; every other field keeps the content it had. That is a
+field-level guarantee, not whole-file byte identity — see "What preservation
+means at the byte level" below.
 
 Everything runs on the local machine. The app makes no network request.
 
@@ -27,51 +27,44 @@ dictionary values (`/Title`, `/Author`, `/Subject`, `/Keywords`, `/Creator`,
 titles, annotation text (`/Contents`, `/T`), and form-field values (`/V`,
 `/DV`). String values are decoded and re-encoded, so both PDF string forms
 (literal `()` and hex `<>`) and both text encodings (PDFDocEncoding and
-UTF-16BE) are handled; the XMP packet is scrubbed for a UTF-8 and a UTF-16BE
-encoding of the name. A value that does not contain the target is written
-back with the same content it had, not a different one, on every scrubbed
-surface. Four of those fields — the Info dictionary, the XMP packet, both
-`/ID` elements and the header version — also come out byte-for-byte identical
-for a file whose target lives only in the page text, and the test suite
-asserts exactly that (`tests/test_redactor.py:137,144-155`). Byte identity for
-the rest (outlines, annotations, form fields) is not asserted or guaranteed;
-see "What preservation means at the byte level" below.
+UTF-16BE) are covered; the XMP packet is scrubbed for the UTF-8, UTF-16BE and
+UTF-16LE encodings of the name. A value that does not contain the target is
+written back with the content it had, on every scrubbed surface.
 
 ## What preservation means at the byte level
 
-`t4_replace` saves through `pdf_save_document` with `do_garbage=3` and
-`do_compress=1` (`CTask4PDF/task4pdf.c:740-742`): a full, non-incremental
-rewrite that garbage-collects and renumbers every object in the file and
-recompresses untouched streams. The output is not a byte-for-byte copy of the
-input with only the target's occurrences changed — object numbers, the xref
-layout and stream encodings can all differ even where no scrubbing touched
-that content.
+`t4_replace` saves through `pdf_save_document` with garbage collection and
+recompression on: a full, non-incremental rewrite that renumbers every object
+in the file and recompresses untouched streams. The output is not a
+byte-for-byte copy of the input with only the target's occurrences changed —
+object numbers, the xref layout and stream encodings can all differ even where
+no scrubbing touched that content.
 
 What the tool guarantees is field-level: every non-target value keeps the
-same content it had, nothing is dropped or altered, and only occurrences of
-the target change. Four fields are additionally asserted byte-identical
-between input and output, because the save path happens not to disturb them
-and the test suite checks it directly (`tests/test_redactor.py:137,
-144-155`): the header version line, the Info dictionary (compared with
-whitespace normalized, `tests/pdfutil.py:97-98`), the XMP metadata stream
-payload, and both `/ID` array elements. Nothing beyond those four is claimed
-to be byte-identical, and the comparison runs on `mutool clean -d` output
-rather than the CLI's raw bytes, because the raw file's object numbering and
-compression are expected to differ from the input's.
+content it had, nothing is dropped or altered, and only occurrences of the
+target change. For a file whose target lives only in the page text, four
+fields are also asserted byte-identical between input and output by
+`test_replace_preserves_metadata` in `tests/test_redactor.py`: the header
+version line, the Info dictionary (compared with whitespace normalized by
+`pdfutil.normalize_ws`), the XMP metadata stream payload, and both `/ID` array
+elements. Nothing beyond those four is claimed to be byte-identical, and the
+comparison runs on `mutool clean -d` output rather than the CLI's raw bytes,
+because the raw file's object numbering and compression differ from the
+input's.
 
 After writing, an independent scan reopens the output and searches every
-surface for the target: page text through `fz_stext`, and every string's
-decoded text plus every content, object-graph and embedded-file stream's
-decompressed bytes in the target's UTF-8 and UTF-16BE encodings. This scan does
-not reuse only the page-text extraction, so it sees a name hidden in
-`/ActualText`, an optional-content group or metadata that page extraction would
-miss. If the target survives on any surface — including inside an embedded file,
-whose arbitrary binary format is out of scope to rewrite safely — the output is
-deleted and a non-zero result returned rather than shipping a file that still
-contains it. A scan that cannot run (the written file will not reopen or
-reparse) is also a failure, never a silent pass. The output is shippable only
-when the return code is 0 and the residual count is 0, which now means the
-target is absent from every surface.
+surface for the target: page text through `fz_stext`; every string's and
+name's decoded text; every content, object-graph and embedded-file stream's
+decompressed bytes in the target's UTF-8, UTF-16BE and UTF-16LE encodings;
+every ToUnicode CMap that maps exactly the target's characters; and every
+annotation appearance stream drawn through a CID font with no Unicode mapping.
+The scan does not reuse the page-text extraction alone, so it sees a name
+hidden in `/ActualText`, an optional-content group or metadata that page
+extraction would miss. If the target survives on any surface, or a surface
+cannot be read back, the output is deleted and a failure returned. A scan that
+cannot run (the written file will not reopen or reparse) is also a failure.
+The output is shippable only when the return code is 0 and the residual count
+is 0.
 
 Filesystem metadata (dates, permissions, extended attributes) is reapplied on
 export; `FileMetadata.apply` also strips the `com.apple.quarantine` and
@@ -81,38 +74,39 @@ the export does not carry a record of the machine that produced it.
 ## Layout
 
 - `CTask4PDF/` — the redaction core in C over MuPDF. `task4pdf.c` exposes one
-  function, `t4_replace`, declared in `include/task4pdf.h`. It builds and runs
-  as a standalone CLI with `-DT4_MAIN` for iteration without Xcode.
-- `App/Sources/` — the SwiftUI app: `NullmarkApp`, `ContentView`, `EditorModel`,
-  `FileMetadata`.
+  function, `t4_replace`, declared in `include/task4pdf.h`, which states every
+  postcondition the caller relies on. It builds and runs as a standalone CLI
+  with `-DT4_MAIN`.
+- `App/Sources/` — the SwiftUI app. `PDFEngine` is the only code that calls
+  `t4_replace`.
+- `tests/` — the pytest suite for the C core, run against the CLI.
 - `project.yml` — the `xcodegen` project. `Signing.xcconfig` builds ad-hoc
   signed with no team.
 
 ## Dependency
 
-MuPDF, LLVM (clang-format, clang-tidy), and cppcheck are required
-workstation tools. This project carries no Brewfile.
+MuPDF, LLVM (clang-format, clang-tidy, LeakSanitizer, libFuzzer, llvm-cov) and
+cppcheck are workstation prerequisites outside `mise.toml`; the justfile header
+names which gate needs each.
 
 `project.yml` links `-lmupdf` and searches `/opt/homebrew/{include,lib}`.
-MuPDF is AGPL: distributing this app beyond personal use requires either
-releasing the app's source under the AGPL or holding a MuPDF commercial
-licence.
+MuPDF is licensed under the AGPL
+([Artifex licensing](https://artifex.com/licensing)): distributing this app
+beyond personal use requires either releasing the app's source under the AGPL
+or holding a MuPDF commercial licence.
 
 ### MuPDF version pin
 
 A workstation dependency is normally named by its install command, not a
-transcribed version, because a written number goes stale silently and
-Renovate does not track it. This dependency is the deliberate
-exception: MuPDF parses attacker-supplied PDF input, so an unreviewed
-upgrade — pulling in a MuPDF version whose own CVE fixes or
-regressions were never looked at — is exactly the exposure nullmark exists to
-avoid introducing elsewhere. `CTask4PDF/mupdf.lock` records the installed
-`mupdf` version and the sha256 of the resolved `libmupdf.dylib` the last
-reviewed build linked; `just mupdf-verify` (wired into `just check`) fails
-the gate if the linked library's version or hash has since drifted.
-
-A missing `mupdf.lock` also fails the gate. After reviewing a MuPDF upgrade
-for its CVE delta, move the pin forward with:
+transcribed version, because a written number goes stale silently and Renovate
+does not track it. MuPDF is the exception: it parses attacker-supplied PDF
+input, so an upgrade whose security fixes and regressions were never reviewed
+changes the attack surface without a decision. `CTask4PDF/mupdf.lock` records
+the installed `mupdf` version and the sha256 of the resolved `libmupdf.dylib`
+the last reviewed build linked; `just mupdf-verify` (part of `just check`)
+fails if the linked library's version or hash differs, or if the lock is
+missing. After reviewing a MuPDF upgrade for its CVE delta, move the pin
+forward with:
 
 ```sh
 just mupdf-lock
@@ -122,48 +116,41 @@ just mupdf-lock
 
 The app does not adopt App Sandbox (no `com.apple.security.app-sandbox` in
 `App.entitlements`) and disables the hardened runtime
-(`ENABLE_HARDENED_RUNTIME: NO` in `project.yml`). Both are dropped for the same
-root cause: `libmupdf.dylib` lives outside the bundle (`/opt/homebrew/lib`),
-is neither Apple-signed nor vendored into it, and:
+(`ENABLE_HARDENED_RUNTIME` is `NO` in `project.yml`). Both are dropped for the
+same root cause: `libmupdf.dylib` lives outside the bundle
+(`/opt/homebrew/lib`), is neither Apple-signed nor vendored into it, and:
 
 - the hardened runtime's library validation refuses to load a dylib not signed
   with the app's own Team ID;
 - App Sandbox's default file-read scope does not cover `/opt/homebrew`, so a
   sandboxed process cannot open the dylib to link it at launch.
 
-This deviation is scoped to this app only.
+This deviation is scoped to this app only. The standalone CLI runs under the
+Seatbelt profile `CTask4PDF/sandbox/nullmark-cli.sb` instead.
 
-## Current state
+## Verification
 
-The C core is proven from the CLI: on matrix-scaled and text-matrix PDFs it
-removes the target (`just test` runs `pytest tests -v` and
-`CTask4PDF/verify-redaction.sh`, both asserting zero residual occurrences),
-places the replacement in the original font and size, scrubs the target from
-the Info dictionary, XMP, outlines, annotations and form fields, refuses to
-emit when the target survives in an embedded file, and preserves every
-non-target field's content — byte-identical for the Info dictionary, XMP,
-both `/ID` elements and the header version (see "What preservation means at
-the byte level" above), semantically unchanged elsewhere.
+`just test` runs the pytest suite and `CTask4PDF/verify-redaction.sh`. Both
+assert zero residual occurrences of the target, the replacement present in the
+output text, the scrub of the Info dictionary, XMP, outlines,
+annotations and form fields, a refusal to emit when the target survives in an
+embedded file or an appearance stream, and the byte identity of the four
+fields above. `tests/README.md` lists every case.
 
-The Swift app calls the C core directly: `PDFEngine.swift` wraps `t4_replace`
-(`PDFEngineError`, `PDFReplacementResult`), and `EditorModel.apply()` calls
-`PDFEngine.replace`. `PDFMetadata` is unrelated to that path — it is a
-read-only struct `EditorModel.load()` builds from the opened document to
-display the Info dictionary and document section in `ContentView`. The app
-target builds: `just build`
-(`xcodegen generate` then `xcodebuild build -project Nullmark.xcodeproj -scheme
-Nullmark CODE_SIGNING_ALLOWED=NO`).
+The Swift app calls the C core through `PDFEngine.replace`, which
+`EditorModel.apply()` calls. `PDFMetadata` is not on that path: it is a
+read-only summary `EditorModel.load()` builds from the opened document for
+display.
 
 ## Known limitations
 
 - An embedded file (`/EmbeddedFiles`) is not rewritten: its format is
   arbitrary binary, and editing it blind risks corrupting it. The independent
-  scan instead detects the target in an embedded file stream and fails closed,
-  so a file that still contains the target in an attachment is refused, never
-  shipped. `T4Result.residual` (surfaced in the app as
-  `PDFEngineError.residual`) counts the target across every surface — page
-  text, metadata and streams — so a remaining occurrence anywhere reports
-  non-zero residual and failure.
+  scan detects the target in an embedded file stream and fails closed, so a
+  file that still contains the target in an attachment is refused.
+  `T4Result.residual` (surfaced in the app as `PDFEngineError.residual`) counts
+  the target across every surface, so a remaining occurrence anywhere reports
+  a non-zero residual and a failure.
 - An appearance stream that draws the target as its own content (a custom
   annotation or widget `/AP` that bakes in the text rather than deriving it
   from the field value) is not rewritten. The scan detects the target there
@@ -171,14 +158,13 @@ Nullmark CODE_SIGNING_ALLOWED=NO`).
 - Text that is an image (a scan) has no text layer to remove and is out of
   scope until OCR or region redaction is added.
 - `FileMetadata.apply(to:)` removes the `com.apple.provenance` extended
-  attribute with `removexattr`, which reports success, but APFS may keep
+  attribute with `removexattr` and does not check the result; APFS may keep
   projecting the attribute onto the exported file regardless.
 
 ## Build
 
 ```sh
-xcodegen generate
-xcodebuild -project Nullmark.xcodeproj -scheme Nullmark build
+just build
 ```
 
 `just check` runs every gate and reports every failure together.
