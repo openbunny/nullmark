@@ -3,6 +3,14 @@ import OpenBunnyUI
 import PDFKit
 import SwiftUI
 
+private let sidebarWidth: CGFloat = 380
+private let dropZonePadding: CGFloat = 28
+private let dropZoneDashLength: CGFloat = 6
+private let chooseButtonWidth: CGFloat = 220
+private let headerMarkSide: CGFloat = 44
+private let stackedTextSpacing: CGFloat = 2
+private let octalRadix = 8
+
 struct ContentView: View {
   @State private var model = EditorModel()
   @State private var dropTargeted = false
@@ -23,7 +31,7 @@ struct ContentView: View {
         .padding(Spacing.loose)
         .padding(.top, Spacing.loose)
       }
-      .frame(width: 380)
+      .frame(width: sidebarWidth)
       .background(Color.background)
       .overlay(alignment: .trailing) {
         Rectangle()
@@ -67,12 +75,13 @@ struct ContentView: View {
         Text("Drop a PDF or click to choose").font(.themeBody)
       }
       .frame(maxWidth: .infinity)
-      .padding(.vertical, 28)
+      .padding(.vertical, dropZonePadding)
       .foregroundStyle(Color.muted)
       .background(
         RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
           .strokeBorder(
-            Color.border, style: StrokeStyle(lineWidth: Metric.borderWidth, dash: [6]))
+            Color.border,
+            style: StrokeStyle(lineWidth: Metric.borderWidth, dash: [dropZoneDashLength]))
       )
       .contentShape(Rectangle())
     }
@@ -143,7 +152,7 @@ struct ContentView: View {
           Label("Choose PDF…", systemImage: "arrow.down.doc")
         }
         .buttonStyle(.outline)
-        .frame(width: 220)
+        .frame(width: chooseButtonWidth)
       }
       .background(dropTargeted ? Color.paperDeep : Color.clear)
       .animation(reduceMotion ? nil : .default, value: dropTargeted)
@@ -159,7 +168,7 @@ struct ContentView: View {
           .accessibilityHidden(true)
           .font(.themeTitle)
           .foregroundStyle(Color.sprout)
-        VStack(alignment: .leading, spacing: 2) {
+        VStack(alignment: .leading, spacing: stackedTextSpacing) {
           Text(url.lastPathComponent)
             .font(.themeBody.weight(.semibold))
             .foregroundStyle(Color.foreground)
@@ -199,7 +208,6 @@ struct ContentView: View {
       KeyValueRow(key: "PDF version", value: metadata.version)
       KeyValueRow(key: "Document ID", value: metadata.fileID ?? "None")
       KeyValueRow(key: "XMP packet", value: xmp)
-      ForEach(metadata.catalog) { KeyValueRow(key: $0.key, value: $0.display) }
     }
   }
 
@@ -215,12 +223,13 @@ struct ContentView: View {
         key: "Accessed",
         value: file.accessed?.formatted(date: .abbreviated, time: .standard) ?? "Unknown")
       KeyValueRow(
-        key: "Permissions", value: file.permissions.map { String($0, radix: 8) } ?? "Unknown")
-      ForEach(file.extendedAttributes.keys.sorted(), id: \.self) { name in
+        key: "Permissions",
+        value: file.permissions.map { String($0, radix: octalRadix) } ?? "Unknown")
+      ForEach(file.extendedAttributes.sorted { $0.key < $1.key }, id: \.key) { attribute in
         KeyValueRow(
-          key: name,
+          key: attribute.key,
           value: ByteCountFormatter.string(
-            fromByteCount: Int64(file.extendedAttributes[name]?.count ?? 0), countStyle: .file))
+            fromByteCount: Int64(attribute.value.count), countStyle: .file))
       }
     }
   }
@@ -229,8 +238,10 @@ struct ContentView: View {
     switch status {
     case .info(let text):
       StatusText(LocalizedStringKey(text), status: .enabled)
+
     case .success(let text):
       StatusText(LocalizedStringKey(text), status: .enabled)
+
     case .failure(let text):
       StatusText(LocalizedStringKey(text), status: .disabled)
     }
@@ -252,14 +263,14 @@ private struct Header: View {
     HStack(spacing: Spacing.base) {
       NullmarkMark()
         .accessibilityHidden(true)
-        .frame(width: 44, height: 44)
+        .frame(width: headerMarkSide, height: headerMarkSide)
         .background(
           Color.paper, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
         )
         .overlay(
           RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
             .strokeBorder(Color.border, lineWidth: Metric.borderWidth))
-      VStack(alignment: .leading, spacing: 2) {
+      VStack(alignment: .leading, spacing: stackedTextSpacing) {
         Text("Nullmark")
           .font(.themeBody.weight(.bold))
           .foregroundStyle(Color.foreground)
@@ -284,12 +295,6 @@ private struct Card<Content: View>: View {
   let title: String
   let symbol: String
   @ViewBuilder let content: () -> Content
-
-  init(title: String, symbol: String, @ViewBuilder content: @escaping () -> Content) {
-    self.title = title
-    self.symbol = symbol
-    self.content = content
-  }
 
   var body: some View {
     VStack(alignment: .leading, spacing: Spacing.base) {
@@ -329,7 +334,9 @@ private struct KeyValueRow: View {
     HStack(alignment: .firstTextBaseline, spacing: Spacing.base) {
       Text(key).font(.themeBody).foregroundStyle(Color.muted)
       Spacer()
-      Text(value).font(.themeMono).foregroundStyle(Color.foreground)
+      Text(value)
+        .font(.themeMono)
+        .foregroundStyle(Color.foreground)
         .multilineTextAlignment(.trailing)
     }
   }
@@ -337,7 +344,7 @@ private struct KeyValueRow: View {
 
 private struct Tag: View {
   let text: String
-  var tint: Color = Color.sprout
+  var tint = Color.sprout
 
   var body: some View {
     Text(text)

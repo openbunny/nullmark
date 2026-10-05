@@ -2,8 +2,12 @@ import OpenBunnyTheme
 import OpenBunnyUI
 import SwiftUI
 
+private let minimumHeight: CGFloat = 24
+private let disabledOpacity = 0.5
+
 struct OutlineButtonStyle: ButtonStyle {
-  @Environment(\.isEnabled) private var isEnabled
+  @Environment(\.isEnabled)
+  private var isEnabled
 
   func makeBody(configuration: Configuration) -> some View {
     configuration.label
@@ -11,11 +15,11 @@ struct OutlineButtonStyle: ButtonStyle {
       .foregroundStyle(Color.foreground)
       .padding(.horizontal, Spacing.base)
       .padding(.vertical, Spacing.tight)
-      .frame(minHeight: 24)
+      .frame(minHeight: minimumHeight)
       .background(configuration.isPressed ? Color.paperInset : Color.paper)
       .overlay(Rectangle().stroke(Color.border, lineWidth: Metric.borderWidth))
       .contentShape(Rectangle())
-      .opacity(isEnabled ? 1 : 0.5)
+      .opacity(isEnabled ? 1 : disabledOpacity)
   }
 }
 

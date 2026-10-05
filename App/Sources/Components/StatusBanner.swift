@@ -2,6 +2,8 @@ import OpenBunnyTheme
 import OpenBunnyUI
 import SwiftUI
 
+private let markSide: CGFloat = 64
+
 struct StatusBanner<Actions: View>: View {
   let title: String
   let message: String
@@ -11,7 +13,7 @@ struct StatusBanner<Actions: View>: View {
     VStack(spacing: Spacing.base) {
       NullmarkMark()
         .accessibilityHidden(true)
-        .frame(width: 64, height: 64)
+        .frame(width: markSide, height: markSide)
       Text(title)
         .font(.themeHeading)
         .foregroundStyle(Color.foreground)

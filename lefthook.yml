@@ -2,15 +2,11 @@ pre-commit:
   parallel: true
   commands:
     fmt-check:
-      run: just fmt-check
-    lint:
-      run: just lint
-    typecheck:
-      run: just typecheck
+      run: 'just fmt-check'
     secrets:
-      run: just secrets
+      run: 'just secrets'
 
 pre-push:
   commands:
     check:
-      run: just check
+      run: 'just check'

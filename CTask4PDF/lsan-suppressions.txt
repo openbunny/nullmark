@@ -1,8 +1,0 @@
-# LeakSanitizer suppressions for the nullmark test-san gate.
-#
-# Homebrew MuPDF is linked non-instrumented, so a leak
-# whose allocation stack lies entirely in its frames is neither nullmark's to fix
-# nor fully visible to the sanitizer. Scoped to the mupdf library frames only:
-# a leak whose stack includes a task4pdf.c frame is not matched here and fails
-# the gate.
-leak:libmupdf

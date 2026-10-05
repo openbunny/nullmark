@@ -1,5 +1,7 @@
 import Foundation
 
+private let hexRadix = 16
+
 struct FileMetadata: Equatable {
   enum ReadError: LocalizedError {
     case nonUTF8AttributeName(Data)
@@ -8,7 +10,7 @@ struct FileMetadata: Equatable {
     var errorDescription: String? {
       switch self {
       case .nonUTF8AttributeName(let raw):
-        let hex = raw.map { ($0 < 0x10 ? "0" : "") + String($0, radix: 16) }.joined()
+        let hex = raw.map { ($0 < hexRadix ? "0" : "") + String($0, radix: hexRadix) }.joined()
         return """
           An extended attribute name is not valid UTF-8 (0x\(hex)). \
           It cannot be preserved, so the file was not opened.

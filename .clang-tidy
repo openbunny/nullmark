@@ -1,8 +1,8 @@
-# bugprone-easily-swappable-parameters  api: t4_replace's four string parameters are the documented interop signature.
+# bugprone-easily-swappable-parameters  api: fires on t4_replace's documented interop signature and on str_replace_all, verify_residual and add_unique_codepoint, which pass the same values in the same order.
 # performance-no-int-to-ptr             macro: fired only inside MuPDF's PDF_NAME() expansion.
 # readability-identifier-length         scope: names scale with scope, so a small scope takes a short name.
 # readability-uppercase-literal-suffix  convention: lowercase f is the C float suffix; the l/1 ambiguity it targets does not apply.
-# readability-function-cognitive-complexity  noisy: the shared C standard sets no cognitive-complexity threshold, and its helper rule forbids the single-use extraction this would force.
+# readability-function-cognitive-complexity  threshold: the C standard sets no cognitive-complexity limit, and general.md admits a helper only at three call sites, which the single-use extraction this check forces does not meet.
 # clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling  annex-k: demands the C11 Annex K _s functions, which macOS libc does not provide.
 Checks: >
   -*,
@@ -20,3 +20,7 @@ Checks: >
   -clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling
 WarningsAsErrors: '*'
 HeaderFilterRegex: 'task4pdf\.h$'
+# readability-magic-numbers               IgnoredIntegerValues: c.md names every meaningful literal; 0 and 1 stay exempt as identity and increment values.
+CheckOptions:
+  readability-magic-numbers.IgnoredIntegerValues: '1'
+  readability-magic-numbers.IgnorePowersOf2IntegerValues: false

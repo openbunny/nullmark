@@ -9,8 +9,10 @@ struct PDFMetadata {
     var id: String { key }
   }
 
+  private static let headerProbeLength = 16
+  private static let versionLength = 3
+
   let info: [Entry]
-  let catalog: [Entry]
   let version: String
   let fileID: String?
   let xmp: Data?
@@ -18,18 +20,17 @@ struct PDFMetadata {
   init(document: PDFDocument, data: Data) {
     version = Self.headerVersion(data)
     info = Self.infoEntries(document.documentAttributes ?? [:])
-    catalog = []
     fileID = Self.trailerFileID(data)
     xmp = Self.xmpPacket(data)
   }
 
   private static func headerVersion(_ data: Data) -> String {
-    guard let header = String(bytes: data.prefix(16), encoding: .ascii),
+    guard let header = String(bytes: data.prefix(headerProbeLength), encoding: .ascii),
       let marker = header.range(of: "%PDF-")
     else {
       return "Unknown"
     }
-    return String(header[marker.upperBound...].prefix(3))
+    return String(header[marker.upperBound...].prefix(versionLength))
   }
 
   private static func infoEntries(_ attributes: [AnyHashable: Any]) -> [Entry] {

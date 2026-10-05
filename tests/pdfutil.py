@@ -78,7 +78,8 @@ def _decode_pdf_string(s: str, i: int) -> tuple[bytes, int]:
         else:
             out.append(ord(c) & 0xFF)
         j += 1
-    raise AssertionError("unterminated PDF literal string in /ID")
+    msg = "unterminated PDF literal string in /ID"
+    raise AssertionError(msg)
 
 
 def id_pair(trailer: str) -> tuple[str, str]:

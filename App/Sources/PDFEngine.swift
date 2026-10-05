@@ -1,32 +1,5 @@
 import Foundation
 
-enum PDFEngineError: LocalizedError {
-  case failed(String)
-  case residual(Int)
-  case embeddedNUL(field: String)
-
-  var errorDescription: String? {
-    switch self {
-    case .failed(let message):
-      message
-
-    case .residual(let count):
-      """
-      The document still contains \(count) occurrence\(count == 1 ? "" : "s") of the text \
-      after redaction. The output was discarded.
-      """
-
-    case .embeddedNUL(let field):
-      "The \(field) text contains a NUL character (U+0000), which C string interop truncates. Remove it and try again."
-    }
-  }
-}
-
-struct PDFReplacementResult {
-  let matches: Int
-  let pagesChanged: Int
-}
-
 enum PDFEngine {
   static func replace(
     find: String, replace: String, inputPath: String, outputPath: String
@@ -57,10 +30,35 @@ enum PDFEngine {
 
   private static func errorMessage(_ result: T4Result) -> String {
     withUnsafeBytes(of: result.error) { raw in
-      guard let base = raw.baseAddress else {
-        return ""
-      }
-      return unsafe String(cString: base.assumingMemoryBound(to: CChar.self))
+      // swiftlint:disable:next optional_data_string_conversion - shows invalid UTF-8 repaired, not dropped
+      unsafe String(decoding: raw.prefix { $0 != 0 }, as: UTF8.self)
     }
   }
+}
+
+enum PDFEngineError: LocalizedError {
+  case embeddedNUL(field: String)
+  case failed(String)
+  case residual(Int)
+
+  var errorDescription: String? {
+    switch self {
+    case .embeddedNUL(let field):
+      "The \(field) text contains a NUL character (U+0000), which C string interop truncates. Remove it and try again."
+
+    case .failed(let message):
+      message
+
+    case .residual(let count):
+      """
+      The document still contains \(count) occurrence\(count == 1 ? "" : "s") of the text \
+      after redaction. The output was discarded.
+      """
+    }
+  }
+}
+
+struct PDFReplacementResult {
+  let matches: Int
+  let pagesChanged: Int
 }

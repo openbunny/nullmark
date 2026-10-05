@@ -1,5 +1,3 @@
-// Redaction coverage regression is guarded by verify-redaction.sh in this
-// directory; the Type0/CID case lives in tests/test_redactor.py.
 #include "task4pdf.h"
 
 #include <mupdf/fitz.h>
@@ -28,16 +26,17 @@ enum {
     UTF16_UNIT_BYTES = 2,
     UTF16BE_BOM_HI = 0xFE,
     UTF16BE_BOM_LO = 0xFF,
-    // Caps a decompressed stream (the XMP packet, and every content/object-graph/
-    // embedded-file stream verify_residual scans) so a crafted compressed stream
-    // cannot force unbounded decompression into memory before scrubbing or
-    // scanning; an oversized stream fails closed instead. 64 MiB comfortably
-    // covers any legitimate PDF metadata or content stream this tool handles.
+    UTF16_MAX_UNITS = 2,
+    NEW_CONTAINER_CAP = 2,
+    TEXT_OP_LEN = 2,
+    GARBAGE_DEDUPLICATE = 3,
+    // Caps every decompressed stream this file scrubs or scans, so a crafted
+    // compressed stream cannot force unbounded decompression into memory; an
+    // oversized stream fails closed.
     MAX_DECOMPRESSED_STREAM_BYTES = 64 * 1024 * 1024,
     STREAM_READ_CHUNK = 65536,
-    // Caps recursion over directly-nested (non-indirect) dict/array structure so
-    // a crafted deeply-nested PDF object cannot exhaust the call stack; exceeding
-    // it fails closed as an unscrubbable/unverifiable object.
+    // Caps recursion over directly nested dict/array structure, so a crafted
+    // object cannot exhaust the call stack; exceeding it fails closed.
     MAX_CONTAINER_DEPTH = 64,
     HEX_ALPHA_OFFSET = 10,
     NIBBLE_BITS = 4,
@@ -45,10 +44,8 @@ enum {
 };
 static const float CHANNEL_MAX = 255.0f;
 
-// Deletes an output file that must not ship: every early-exit and error path,
-// and the path where verification found a residual. The caller is already told
-// of the failure through the return code or a non-zero out->residual, and no
-// recovery is possible beyond that, so remove()'s result is not checked here.
+// remove()'s result is not checked: every caller is already reporting a failure
+// through the return code or a non-zero out->residual, and no recovery exists.
 static void discard_output(const char *path) {
     remove(path); // NOLINT(cert-err33-c): best-effort cleanup on a failing path, see above.
 }
@@ -85,8 +82,6 @@ static void sanitize_trailer(fz_context *ctx, pdf_document *doc) {
     }
 }
 
-// A run of the target text located on a page: the bounding rect to redact and
-// the position, font, size and colour needed to draw the replacement in its place.
 typedef struct {
     fz_rect rect;
     fz_point origin;
@@ -95,9 +90,8 @@ typedef struct {
     uint32_t argb;
 } Match;
 
-// Decodes every UTF-8 codepoint of `s`, storing up to `max` into `out`, and
-// returns the total codepoint count. A return greater than `max` means the
-// input was longer than the buffer and `out` holds only its first `max`.
+// Returns the total codepoint count of `s`. A return greater than `max` means
+// `out` holds only the first `max` codepoints.
 static int decode_codepoints(const char *s, int *out, int max) {
     int n = 0;
     while (*s) {
@@ -125,10 +119,8 @@ static int count_stext_chars(const fz_stext_page *stext) {
     return count;
 }
 
-// Collects every occurrence of `needle` (codepoints) in reading order on one
-// page into a freshly allocated array the caller owns and frees. Returns the
-// match count and sets `*out` to the array (NULL when the count is 0). The
-// array is sized to the page's glyph count, so no occurrence is dropped.
+// The caller frees `*out`, which is NULL when the count is 0. The array is
+// sized from the page's glyph count, so no occurrence is dropped.
 static int collect_matches(fz_context *ctx, const fz_stext_page *stext, const int *needle,
                            int needle_len, Match **out) {
     *out = NULL;
@@ -189,9 +181,8 @@ static int collect_matches(fz_context *ctx, const fz_stext_page *stext, const in
     return found;
 }
 
-// Draws `replacement` as a run of glyphs starting at `origin`, using `font` and
-// falling back to a substitute font for any character the run's font lacks, so
-// the new text always renders even when the original was a subset.
+// Falls back to a substitute font for any character `font` lacks: the original
+// run's font can be a subset holding only the target's glyphs.
 static void draw_replacement(fz_context *ctx, fz_device *dev, const char *replacement,
                              fz_font *font, float size, fz_point origin, uint32_t argb) {
     fz_text *text = fz_new_text(ctx);
@@ -224,8 +215,8 @@ static void draw_replacement(fz_context *ctx, fz_device *dev, const char *replac
     fz_drop_text(ctx, text);
 }
 
-// Appends the drawn content as a form XObject invoked from a new content stream,
-// so its font resources cannot collide with the page's own resource names.
+// A form XObject keeps the replacement's font resources from colliding with
+// the page's own resource names.
 static void append_form(fz_context *ctx, pdf_document *doc, pdf_page *page, fz_rect bbox,
                         pdf_obj *resources, fz_buffer *contents) {
     pdf_obj *form = pdf_new_dict(ctx, doc, FORM_DICT_CAP);
@@ -238,11 +229,11 @@ static void append_form(fz_context *ctx, pdf_document *doc, pdf_page *page, fz_r
 
     pdf_obj *page_res = pdf_dict_get(ctx, page->obj, PDF_NAME(Resources));
     if (!page_res) {
-        page_res = pdf_dict_put_dict(ctx, page->obj, PDF_NAME(Resources), 2);
+        page_res = pdf_dict_put_dict(ctx, page->obj, PDF_NAME(Resources), NEW_CONTAINER_CAP);
     }
     pdf_obj *xobj = pdf_dict_get(ctx, page_res, PDF_NAME(XObject));
     if (!xobj) {
-        xobj = pdf_dict_put_dict(ctx, page_res, PDF_NAME(XObject), 2);
+        xobj = pdf_dict_put_dict(ctx, page_res, PDF_NAME(XObject), NEW_CONTAINER_CAP);
     }
 
     char name[XOBJ_NAME_CAP];
@@ -265,7 +256,7 @@ static void append_form(fz_context *ctx, pdf_document *doc, pdf_page *page, fz_r
     if (pdf_is_array(ctx, page_contents)) {
         pdf_array_push(ctx, page_contents, cstream);
     } else {
-        pdf_obj *arr = pdf_new_array(ctx, doc, 2);
+        pdf_obj *arr = pdf_new_array(ctx, doc, NEW_CONTAINER_CAP);
         if (page_contents) {
             pdf_array_push(ctx, arr, page_contents);
         }
@@ -277,17 +268,15 @@ static void append_form(fz_context *ctx, pdf_document *doc, pdf_page *page, fz_r
     pdf_drop_obj(ctx, cstream);
 }
 
-// True when the string `obj` decodes to text holding U+0000: every
-// strlen/strstr caller downstream would stop there and miss the rest of the
-// value, so both scrub and verify fail closed on it. Reads raw bytes with
-// explicit length (a BOM opens UTF-16BE units; elsewhere a 0x00 byte decides).
-// Names need no check: the lexer splits them at a NUL escape. Call before
-// fetching decoded text: both convert through shared static buffers.
+// A decoded U+0000 would stop every strlen/strstr caller downstream before the
+// rest of the value, so scrub and verify both fail closed on it. Names need no
+// check: the lexer splits them at a NUL escape. Call before fetching decoded
+// text: both convert through shared static buffers.
 static int decoded_text_is_nul_truncated(fz_context *ctx, pdf_obj *obj) {
     size_t len = 0;
     const unsigned char *raw = (const unsigned char *)pdf_to_string(ctx, obj, &len);
-    if (len >= 2 && raw[0] == UTF16BE_BOM_HI && raw[1] == UTF16BE_BOM_LO) {
-        for (size_t i = 2; i + 1 < len; i += UTF16_UNIT_BYTES) {
+    if (len >= UTF16_UNIT_BYTES && raw[0] == UTF16BE_BOM_HI && raw[1] == UTF16BE_BOM_LO) {
+        for (size_t i = UTF16_UNIT_BYTES; i + 1 < len; i += UTF16_UNIT_BYTES) {
             if (raw[i] == 0 && raw[i + 1] == 0) {
                 return 1;
             }
@@ -297,9 +286,8 @@ static int decoded_text_is_nul_truncated(fz_context *ctx, pdf_obj *obj) {
     return memchr(raw, 0, len) != NULL;
 }
 
-// Replaces every occurrence of `find` in the UTF-8 string `hay` with `repl`,
-// returning a NUL-terminated buffer the caller drops, or NULL when `find` does
-// not occur. UTF-8 is self-synchronising, so a byte-level search matches only at
+// Returns a NUL-terminated buffer the caller drops, or NULL when `find` does not
+// occur. UTF-8 is self-synchronising, so a byte-level search matches only at
 // codepoint boundaries of valid UTF-8.
 static fz_buffer *str_replace_all(fz_context *ctx, const char *hay, const char *find,
                                   const char *repl) {
@@ -324,9 +312,7 @@ static fz_buffer *str_replace_all(fz_context *ctx, const char *hay, const char *
     return out;
 }
 
-// Encodes the UTF-8 string `utf8` as UTF-16 code units, big-endian unless
-// `little_endian`, into a freshly allocated buffer the caller frees, setting
-// `*out_len` to the byte count.
+// The caller frees the returned buffer.
 static unsigned char *encode_utf16(fz_context *ctx, const char *utf8, int little_endian,
                                    size_t *out_len) {
     unsigned char *out = fz_malloc(ctx, (strlen(utf8) * UTF16_UNIT_BYTES) + UTF16_UNIT_BYTES);
@@ -334,7 +320,7 @@ static unsigned char *encode_utf16(fz_context *ctx, const char *utf8, int little
     for (const char *p = utf8; *p != '\0';) {
         int c = 0;
         p += fz_chartorune(&c, p);
-        int units[2];
+        int units[UTF16_MAX_UNITS];
         int n = 1;
         if (c > UTF16_MAX_BMP) {
             int v = c - UTF16_ASTRAL_BASE;
@@ -342,7 +328,7 @@ static unsigned char *encode_utf16(fz_context *ctx, const char *utf8, int little
                 (int)((unsigned)UTF16_SURROGATE_HI + ((unsigned)v >> (unsigned)UTF16_HI_SHIFT));
             units[1] =
                 (int)((unsigned)UTF16_SURROGATE_LO + ((unsigned)v & (unsigned)UTF16_LO_MASK));
-            n = 2;
+            n = UTF16_MAX_UNITS;
         } else {
             units[0] = c;
         }
@@ -358,24 +344,19 @@ static unsigned char *encode_utf16(fz_context *ctx, const char *utf8, int little
     return out;
 }
 
-// Used to find and to replace the target where a PDF text string or an XMP
-// packet stores it in big-endian UTF-16, the form pdf_to_text_string decodes.
 static unsigned char *encode_utf16be(fz_context *ctx, const char *utf8, size_t *out_len) {
     return encode_utf16(ctx, utf8, 0, out_len);
 }
 
-// Used to find the target in little-endian UTF-16, the form a PDF string
-// object never carries (pdf_to_text_string normalises that distinction away)
-// but a producer-controlled raw stream — an embedded file, a /JS script, an
-// XFA datasets packet — commonly does when authored by Windows tooling.
+// A PDF string object never carries little-endian UTF-16, but a raw stream
+// (an embedded file, a /JS script, an XFA datasets packet) can.
 static unsigned char *encode_utf16le(fz_context *ctx, const char *utf8, size_t *out_len) {
     return encode_utf16(ctx, utf8, 1, out_len);
 }
 
-// Builds a new string object with the target replaced in the decoded text of
-// `str`, or NULL when the target does not occur. pdf_to_text_string decodes
-// PDFDocEncoding and UTF-16BE alike, and pdf_new_text_string re-encodes,
-// so both PDF string forms and both text encodings are handled.
+// Returns NULL when the target does not occur. pdf_to_text_string decodes
+// PDFDocEncoding and UTF-16BE alike and pdf_new_text_string re-encodes, so both
+// PDF string forms and both text encodings are covered.
 static pdf_obj *scrub_string_value(fz_context *ctx, pdf_obj *str, const char *find,
                                    const char *repl) {
     if (decoded_text_is_nul_truncated(ctx, str)) {
@@ -397,10 +378,9 @@ static pdf_obj *scrub_string_value(fz_context *ctx, pdf_obj *str, const char *fi
     return out;
 }
 
-// Builds a new name object with the target replaced in the decoded text of
-// `nm`, or NULL when the target does not occur. pdf_to_name resolves a name's
-// '#XX' byte-escapes and pdf_new_name re-escapes on write as needed, so a
-// target hidden behind such an escape is still found and replaced.
+// Returns NULL when the target does not occur. pdf_to_name resolves '#XX'
+// escapes and pdf_new_name re-escapes, so a target hidden behind an escape is
+// still found.
 static pdf_obj *scrub_name_value(fz_context *ctx, pdf_obj *nm, const char *find, const char *repl) {
     const char *decoded = pdf_to_name(ctx, nm);
     fz_buffer *replaced = str_replace_all(ctx, decoded, find, repl);
@@ -418,11 +398,6 @@ static pdf_obj *scrub_name_value(fz_context *ctx, pdf_obj *nm, const char *find,
     return out;
 }
 
-// Builds a replacement for `val` with the target scrubbed from its decoded
-// text, or NULL when `val` is neither a string nor a name or holds no target.
-// Dict keys never reach here: renaming a key changes which entry a reader
-// finds under the standard name, a structural change past what a value-level
-// scrub makes (see scrub_container).
 static pdf_obj *scrub_value(fz_context *ctx, pdf_obj *val, const char *find, const char *repl) {
     if (pdf_is_string(ctx, val)) {
         return scrub_string_value(ctx, val, find, repl);
@@ -433,19 +408,10 @@ static pdf_obj *scrub_value(fz_context *ctx, pdf_obj *val, const char *find, con
     return NULL;
 }
 
-// Replaces the target in every string or name reachable through the direct
-// (non-indirect) structure of `obj`, returning the number of values changed.
-// A name used as a dict *key* (rather than a value) is not scrubbed: renaming
-// a key changes which entry a reader finds under the standard name, a
-// structural change past what a value-level scrub can safely make. A key
-// bearing the target is instead caught by the verification scan, which reads
-// keys and fails closed. Indirect references are left to their own pass, so each object is
-// visited once and cycles cannot recur. `depth` is the nesting level of `obj`
-// below the object scrub_metadata_strings loaded (0 at that top level); once it
-// would exceed MAX_CONTAINER_DEPTH this throws rather than recursing further, so
-// a crafted deeply-nested dict/array cannot exhaust the call stack. That failure
-// propagates out of the scrub pass and, like any other, causes the output to be
-// discarded rather than shipped partially scrubbed.
+// A dict key is not scrubbed: renaming a key changes which entry a reader finds
+// under the standard name. A key bearing the target is caught by the
+// verification scan instead, which fails closed. Indirect references are skipped
+// so each object is visited once by its own pass and a cycle cannot recur.
 static int scrub_container(fz_context *ctx, pdf_obj *obj, const char *find, const char *repl,
                            int depth) {
     if (depth > MAX_CONTAINER_DEPTH) {
@@ -494,11 +460,8 @@ static int scrub_container(fz_context *ctx, pdf_obj *obj, const char *find, cons
     return changed;
 }
 
-// Scrubs the target from every string or name object in the document: Info
-// dictionary values, outline and annotation and form-field text, Name-typed
-// values (§7.3.5's '#XX' byte-escapes resolved), and any other string or
-// name, custom keys included. Each numbered object is loaded once, covering
-// strings and names packed into object streams. Returns the number changed.
+// Loading each numbered object reaches strings and names packed into object
+// streams as well as top-level ones.
 static int scrub_metadata_strings(fz_context *ctx, pdf_document *doc, const char *find,
                                   const char *repl) {
     int total = 0;
@@ -526,12 +489,7 @@ static int scrub_metadata_strings(fz_context *ctx, pdf_document *doc, const char
     return total;
 }
 
-// Replaces occurrences of `find` (as bytes `flen` long) with `repl` in `in`,
-// returning a new buffer the caller drops, or NULL when the pattern is absent.
-// `*count` receives the number of replacements. `in` is capped to
-// MAX_DECOMPRESSED_STREAM_BYTES by every caller, so a 64-bit counter is not
-// load-bearing for overflow on its own, but matches the width of every other
-// occurrence count derived from decompressed stream bytes.
+// Returns a buffer the caller drops, or NULL when the pattern is absent.
 static fz_buffer *buf_replace_all(fz_context *ctx, fz_buffer *in, const unsigned char *find,
                                   size_t flen, const unsigned char *repl, size_t rlen,
                                   int64_t *count) {
@@ -571,15 +529,10 @@ static fz_buffer *buf_replace_all(fz_context *ctx, fz_buffer *in, const unsigned
     return out;
 }
 
-// Reads PDF stream `num`'s decompressed bytes into a freshly allocated buffer
-// the caller drops, reading incrementally and rejecting the stream once its
-// decompressed size exceeds MAX_DECOMPRESSED_STREAM_BYTES. Reading in bounded
-// chunks, rather than calling pdf_load_stream_number (which decompresses the
-// whole stream into memory unconditionally before any size can be checked),
-// keeps a crafted compression bomb from forcing an unbounded allocation.
-// Throws on an oversized stream, consistent with this file's fail-closed
-// design: the caller's failure path discards the output rather than scanning
-// or scrubbing a truncated read.
+// Reads in bounded chunks instead of calling pdf_load_stream_number, which
+// decompresses the whole stream before any size can be checked, so a
+// compression bomb cannot force an unbounded allocation. Throws past
+// MAX_DECOMPRESSED_STREAM_BYTES rather than returning a truncated read.
 static fz_buffer *load_stream_capped(fz_context *ctx, pdf_document *doc, int num) {
     fz_stream *stm = NULL;
     fz_buffer *buf = NULL;
@@ -611,10 +564,7 @@ static fz_buffer *load_stream_capped(fz_context *ctx, pdf_document *doc, int num
     return buf;
 }
 
-// Scrubs the target from the /Root/Metadata XMP packet, covering a UTF-8, a
-// UTF-16BE and a UTF-16LE encoding of the name, and writes the packet back
-// uncompressed with a corrected length. Returns the number of replacements;
-// leaves the stream untouched when the target does not occur.
+// Writes the packet back uncompressed, and only when the target occurred.
 static int64_t scrub_xmp(fz_context *ctx, pdf_document *doc, const char *find, const char *repl) {
     pdf_obj *root = pdf_dict_get(ctx, pdf_trailer(ctx, doc), PDF_NAME(Root));
     pdf_obj *meta = pdf_dict_get(ctx, root, PDF_NAME(Metadata));
@@ -687,11 +637,8 @@ static int64_t scrub_xmp(fz_context *ctx, pdf_document *doc, const char *find, c
     return total;
 }
 
-// Counts non-overlapping occurrences of the `nlen`-byte `needle` in `hay`. A
-// 64-bit counter avoids overflow on `hay` buffers up to
-// MAX_DECOMPRESSED_STREAM_BYTES: even an nlen-1 needle cannot produce more
-// occurrences than the buffer has bytes, and that count alone already exceeds
-// what a 32-bit signed counter can hold without this width.
+// The count is 64-bit because verify_residual sums it over every stream in the
+// document, and MAX_DECOMPRESSED_STREAM_BYTES bounds only one stream.
 static int64_t count_needle_bytes(const unsigned char *hay, size_t hlen,
                                   const unsigned char *needle, size_t nlen) {
     if (nlen == 0) {
@@ -709,19 +656,13 @@ static int64_t count_needle_bytes(const unsigned char *hay, size_t hlen,
     return c;
 }
 
-// Counts occurrences of `find` in the decoded text of every string or name
-// reachable through the direct structure of `obj`. Indirect references are
-// visited in their own pass, so each object is counted once. `depth` bounds
-// recursion exactly as in scrub_container (see there); exceeding
-// MAX_CONTAINER_DEPTH throws, which verify_residual's caller treats as an
-// unverifiable output and therefore a failure, never a silent pass.
+// Exceeding MAX_CONTAINER_DEPTH throws, which t4_replace treats as an
+// unverifiable output and therefore a failure.
 static int64_t scan_container_strings(fz_context *ctx, pdf_obj *obj, const char *find, int depth);
 
-// Counts occurrences of `find` in an /ID array's digest elements on raw bytes
-// with explicit lengths. These elements are opaque 128-bit digests, not text:
-// reading them through a C-string view would trip on any 0x00 byte they
-// legitimately hold (about one run in sixteen per element), while the save
-// preserves them byte-identical, so a raw count is exact and never blind.
+// /ID elements are opaque 128-bit digests, not text, and a random digest holds
+// a 0x00 byte about one time in sixteen: a C-string view would stop there, so
+// they are counted on raw bytes with explicit lengths.
 static int64_t count_id_needles(fz_context *ctx, pdf_obj *arr, const char *find, int depth) {
     int64_t total = 0;
     int n = pdf_array_len(ctx, arr);
@@ -781,16 +722,14 @@ static int64_t scan_container_strings(fz_context *ctx, pdf_obj *obj, const char 
     return total;
 }
 
-// True for the cross-reference and object-stream containers, whose serialised
-// form holds other objects' bytes. Their logical contents are scanned as
-// individual objects, so scanning the container too would double-count and
-// could match a structural name that is not a scrubbable string.
+// Cross-reference and object-stream containers hold other objects' bytes, which
+// are scanned as individual objects; scanning the container too would
+// double-count and could match a structural name.
 static int is_structural_stream(fz_context *ctx, pdf_obj *obj) {
     pdf_obj *type = pdf_dict_get(ctx, obj, PDF_NAME(Type));
     return pdf_name_eq(ctx, type, PDF_NAME(ObjStm)) || pdf_name_eq(ctx, type, PDF_NAME(XRef));
 }
 
-// The hex digit value of `c`, or -1 when `c` is not one.
 static int hexval(char c) {
     if (c >= '0' && c <= '9') {
         return c - '0';
@@ -804,12 +743,9 @@ static int hexval(char c) {
     return -1;
 }
 
-// Parses the next `<hex...>` CMap literal at or after `s[*pos]` (within
-// `len`), writing its decoded bytes to `buf` (capped at `cap`; non-hex bytes
-// such as embedded whitespace are skipped, matching how a CMap interpreter
-// reads one) and advancing `*pos` past the closing '>'. Returns the decoded
-// byte count, which may exceed `cap`. Leaves `*pos` at `len` when no '<'
-// remains.
+// Skips non-hex bytes inside the literal, as a CMap interpreter does. Returns
+// the decoded byte count, which may exceed `cap`. Leaves `*pos` at `len` when
+// no '<' remains.
 static size_t parse_hex_literal(const char *s, size_t len, size_t *pos, unsigned char *buf,
                                 size_t cap) {
     size_t i = *pos;
@@ -830,7 +766,7 @@ static size_t parse_hex_literal(const char *s, size_t len, size_t *pos, unsigned
                 hi = d;
             } else {
                 if (n < cap) {
-                    buf[n] = (unsigned char)(((unsigned)hi << 4u) | (unsigned)d);
+                    buf[n] = (unsigned char)(((unsigned)hi << (unsigned)NIBBLE_BITS) | (unsigned)d);
                 }
                 n++;
                 hi = -1;
@@ -845,9 +781,7 @@ static size_t parse_hex_literal(const char *s, size_t len, size_t *pos, unsigned
     return n;
 }
 
-// Decodes `n` big-endian UTF-16 bytes (surrogate pairs included) into
-// codepoints, storing up to `max` into `out`. Returns the codepoint count,
-// which may exceed `max`.
+// Returns the codepoint count, which may exceed `max`.
 static int decode_utf16be_bytes(const unsigned char *bytes, size_t n, int *out, int max) {
     int cnt = 0;
     size_t i = 0;
@@ -873,11 +807,9 @@ static int decode_utf16be_bytes(const unsigned char *bytes, size_t n, int *out, 
     return cnt;
 }
 
-// Appends `cp` to `set` (sized `*n`, capped at `max`) unless already present.
 static void add_unique_codepoint(int *set, int *n, int max, int cp) {
-    // *n is allowed to exceed max on return (the caller treats that as an
-    // overflow signal), but set[] only has max slots: the dedup scan below
-    // must stop at max once *n has passed it, or it reads past the array.
+    // *n may exceed max on return as the caller's overflow signal, but set[]
+    // has only max slots, so the scan stops at max.
     int seen = *n < max ? *n : max;
     for (int i = 0; i < seen; i++) {
         if (set[i] == cp) {
@@ -890,13 +822,10 @@ static void add_unique_codepoint(int *set, int *n, int max, int cp) {
     (*n)++;
 }
 
-// Collects the distinct Unicode codepoints reachable through a CMap stream's
-// beginbfchar/endbfchar blocks (ISO 32000-1 §9.10.3): each entry's
-// destination hex literal, decoded as UTF-16BE text. Into `out` (capped at
-// `max`, deduplicated); returns the distinct count. A single forward pass
-// over `s`, so a crafted stream cannot make this quadratic. bfrange blocks
-// are not parsed — the ranged form this scan does not cover — so a target
-// mapped only through one is not caught by it.
+// Reads beginbfchar destinations as UTF-16BE (ISO 32000-1 section 9.10.3,
+// https://opensource.adobe.com/dc-acrobat-sdk-docs/pdfstandards/PDF32000_2008.pdf).
+// bfrange blocks are not parsed, so a target mapped only through one is not
+// caught here.
 static int cmap_bfchar_codepoints(const char *s, size_t len, int *out, int max) {
     int n = 0;
     size_t i = 0;
@@ -943,15 +872,11 @@ static int cmap_bfchar_codepoints(const char *s, size_t len, int *out, int max) 
     return n;
 }
 
-// True when a ToUnicode CMap's bfchar destinations decode to exactly the
-// target's distinct codepoints and no others: the signature of a font
-// subsetted (as nullmark's own tests/fixtures/generate.py:build_cidfont does)
-// to draw only the target's letters, whose glyph-to-Unicode table survives a
-// content-stream redaction of those glyphs (whether on the page or in an
-// annotation appearance stream, both scanned as ordinary streams below) and
-// so still reconstructs the target's character set. A real document's
-// broader-coverage embedded font is not flagged: its CMap maps many more
-// codepoints than the target's, failing the exact-match test.
+// True when the bfchar destinations are exactly the target's distinct
+// codepoints: the signature of a font subsetted to the target's letters, whose
+// glyph-to-Unicode table survives the redaction of those glyphs and still
+// spells the target's character set. A font mapping any other codepoint is not
+// flagged.
 static int cmap_reveals_target(const char *data, size_t len, const int *needle, int needle_len) {
     if (needle_len <= 0 || needle_len > MAX_NEEDLE) {
         return 0;
@@ -984,7 +909,6 @@ static int cmap_reveals_target(const char *data, size_t len, const int *needle, 
     return 1;
 }
 
-// True when `cp` is one of the `n` codepoints in `set`.
 static int codepoint_in_set(int cp, const int *set, int n) {
     for (int i = 0; i < n; i++) {
         if (set[i] == cp) {
@@ -994,7 +918,6 @@ static int codepoint_in_set(int cp, const int *set, int n) {
     return 0;
 }
 
-// Appends a CMap hex literal `<HH...>` for the `n` bytes of `bytes` to `out`.
 static void append_hex_literal(fz_context *ctx, fz_buffer *out, const unsigned char *bytes,
                                size_t n) {
     static const char hexd[] = "0123456789ABCDEF";
@@ -1008,16 +931,11 @@ static void append_hex_literal(fz_context *ctx, fz_buffer *out, const unsigned c
     fz_append_byte(ctx, out, '>');
 }
 
-// Rebuilds a ToUnicode CMap keeping only the bfchar entries whose destination
-// decodes entirely to codepoints in `keep` (the replacement's codepoints): the
-// glyphs the replacement still draws through this font. The orphaned entries a
-// redaction leaves behind — glyphs that spelled the now-removed target and are
-// no longer drawn — are dropped, so the rebuilt CMap no longer reconstructs the
-// target while every mapping the replacement relies on survives. Returns a new
-// buffer the caller drops, or NULL when no entry is kept (the caller then
-// removes the /ToUnicode outright). bfrange entries are not carried over;
-// cmap_reveals_target does not parse them either, so a CMap flagged and reached
-// here maps the target only through bfchar.
+// Keeps only the bfchar entries whose destination lies entirely in `keep`, the
+// replacement's codepoints. Returns a buffer the caller drops, or NULL when no
+// entry is kept. bfrange entries are not carried over: cmap_reveals_target
+// does not parse them either, so a CMap reaching here maps the target only
+// through bfchar.
 static fz_buffer *filter_tounicode(fz_context *ctx, const char *s, size_t len, const int *keep,
                                    int keep_n) {
     fz_buffer *entries = fz_new_buffer(ctx, len);
@@ -1108,18 +1026,9 @@ static fz_buffer *filter_tounicode(fz_context *ctx, const char *s, size_t len, c
     return out;
 }
 
-// Repairs every font whose /ToUnicode CMap reconstructs exactly the target and
-// nothing else (cmap_reveals_target) after that font's glyphs were redacted from
-// the page: the drawn glyphs are gone, but the glyph-to-Unicode table still
-// spells the target out for a text extractor, which verify_residual's own
-// cmap_reveals_target scan catches and fails closed on. The CMap is rewritten
-// (filter_tounicode) to keep only the entries the replacement still draws
-// through this font and drop the target's now-orphaned ones; if nothing is kept,
-// or the rewrite would still reveal the target (the replacement's own letters
-// cover the target's), the /ToUnicode is removed outright and the now-unreferenced
-// stream is dropped by the do_garbage=3 save. A broader-coverage font, whose CMap
-// maps more than the target, is never flagged and keeps its /ToUnicode intact.
-// Returns the number of CMaps repaired or removed.
+// Removes the /ToUnicode outright when the filtered CMap is empty or would still
+// reveal the target (the replacement's letters cover the target's); the save's
+// garbage collection then drops the unreferenced stream.
 static int scrub_tounicode_cmaps(fz_context *ctx, pdf_document *doc, const char *replace,
                                  const int *needle, int needle_len) {
     int keep[MAX_NEEDLE];
@@ -1174,13 +1083,9 @@ static int scrub_tounicode_cmaps(fz_context *ctx, pdf_document *doc, const char 
     return total;
 }
 
-// True when `font`, a Font resource dict, is a Type0 (CID-keyed) font with no
-// /ToUnicode CMap: no declared way to recover the Unicode text its codes
-// draw. Content shown through such a font is invisible to both the
-// stext-based oracle below (fz_stext needs a Unicode mapping to produce text)
-// and cmap_reveals_target above (nothing to parse), so its presence, not its
-// content, is what gets checked: this function does not and cannot determine
-// what text such a font draws.
+// A Type0 font with no /ToUnicode has no declared way to recover the text its
+// codes draw: fz_stext and cmap_reveals_target are both blind to it, so its
+// presence is checked, not its content.
 static int font_is_unverifiable_cid(fz_context *ctx, pdf_obj *font) {
     if (!pdf_is_dict(ctx, font)) {
         return 0;
@@ -1192,13 +1097,8 @@ static int font_is_unverifiable_cid(fz_context *ctx, pdf_obj *font) {
     return pdf_dict_get(ctx, font, PDF_NAME(ToUnicode)) == NULL;
 }
 
-// True when appearance-stream object `stream_obj` both shows text (contains a
-// Tj or TJ operator — a cheap substring check, sufficient to decide whether
-// the stream draws glyphs at all without a full content-stream parse) and
-// resolves at least one font in its own /Resources/Font dict to an
-// unverifiable CID font per font_is_unverifiable_cid. A PDF form XObject
-// carries its own /Resources, so this needs nothing from the page or
-// annotation that references the stream.
+// "Shows text" is a substring search for Tj or TJ, not a content-stream parse:
+// a match inside operand bytes can only add a fail-closed result.
 static int ap_stream_is_unverifiable(fz_context *ctx, pdf_obj *stream_obj) {
     if (!pdf_is_stream(ctx, stream_obj)) {
         return 0;
@@ -1225,23 +1125,16 @@ static int ap_stream_is_unverifiable(fz_context *ctx, pdf_obj *stream_obj) {
         buf = pdf_load_stream(ctx, stream_obj);
         unsigned char *data = NULL;
         size_t len = fz_buffer_storage(ctx, buf, &data);
-        shows_text = count_needle_bytes(data, len, (const unsigned char *)"Tj", 2) > 0 ||
-                     count_needle_bytes(data, len, (const unsigned char *)"TJ", 2) > 0;
+        shows_text = count_needle_bytes(data, len, (const unsigned char *)"Tj", TEXT_OP_LEN) > 0 ||
+                     count_needle_bytes(data, len, (const unsigned char *)"TJ", TEXT_OP_LEN) > 0;
     }
     fz_always(ctx) { fz_drop_buffer(ctx, buf); }
     fz_catch(ctx) { fz_rethrow(ctx); }
     return shows_text;
 }
 
-// Applies ap_stream_is_unverifiable to every leaf stream reachable from an
-// annotation appearance-dict entry `v`: a stream directly, or (a widget with
-// more than one appearance, e.g. a checkbox's Off/On states) a dict of
-// streams keyed by state name. Every state is visited, not only the one
-// /AS currently names — every state ships bytes in the file regardless of
-// which one is selected, and t4_replace's redaction pass never rewrites
-// annotation appearance streams at all (see the comment in t4_replace), so
-// an unselected state is exactly as unverified as the selected one. Returns
-// the number of unverifiable leaf streams found.
+// Visits every appearance state, not only the one /AS names: every state ships
+// in the file, and no appearance stream is rewritten.
 static int scan_ap_state(fz_context *ctx, pdf_obj *v) {
     if (v == NULL) {
         return 0;
@@ -1260,11 +1153,8 @@ static int scan_ap_state(fz_context *ctx, pdf_obj *v) {
     return 0;
 }
 
-// Scans every annotation on `page` — Hidden and NoView ones included, since
-// pdf_first_annot/pdf_next_annot walk the /Annots array itself rather than
-// anything rendering-filtered — for an appearance stream this tool cannot
-// prove is target-free (see ap_stream_is_unverifiable). Returns the count
-// found, added into verify_residual's fail-closed total below.
+// pdf_first_annot/pdf_next_annot walk the /Annots array itself, so Hidden and
+// NoView annotations are included.
 static int scan_page_annots_unverifiable(fz_context *ctx, pdf_page *page) {
     int total = 0;
     for (pdf_annot *annot = pdf_first_annot(ctx, page); annot != NULL;
@@ -1281,21 +1171,14 @@ static int scan_page_annots_unverifiable(fz_context *ctx, pdf_page *page) {
     return total;
 }
 
-// Counts the target still present anywhere in the written file, independently of
-// the redaction path. Oracles run against a freshly opened copy: the page
-// text extracted by fz_stext (blind to /ActualText, hidden layers and metadata),
-// a byte-and-decode scan of every object — each string's and name's decoded
-// text, and every content, object-graph and embedded-file stream's decompressed
-// bytes in the target's UTF-8, UTF-16BE and UTF-16LE encodings — a CMap-aware
-// scan of every stream for a ToUnicode table that reveals the target (see
-// cmap_reveals_target), and a scan of every annotation's appearance streams,
-// Hidden and NoView ones included, for CID-font text this tool has no way to
-// read back (see scan_page_annots_unverifiable): such a stream is treated as
-// a failure to verify, not as an absence of the target, and fails closed the
-// same as a confirmed match. A non-zero result means the target survives, or
-// cannot be shown not to survive, on some surface. A throw (a file that will
-// not reopen or reparse) propagates, so an unverifiable output is a failure,
-// never a silent pass.
+// Reopens the written file and counts the target through oracles independent
+// of the redaction path: fz_stext page text (blind to /ActualText, hidden
+// layers and metadata); every string's and name's decoded text; every
+// non-structural stream's decompressed bytes in UTF-8, UTF-16BE and UTF-16LE;
+// every ToUnicode CMap that reveals the target; and every appearance stream
+// drawn through an unverifiable CID font, which counts as a failure to verify.
+// A non-zero result means the target survives, or cannot be shown absent, on
+// some surface. A file that will not reopen or reparse throws.
 static int64_t verify_residual(fz_context *ctx, const char *out_path, const char *find,
                                const int *needle, int needle_len) {
     pdf_document *doc = NULL;
@@ -1381,9 +1264,8 @@ static int64_t verify_residual(fz_context *ctx, const char *out_path, const char
             pdf_drop_obj(ctx, obj);
             obj = NULL;
         }
-        // The trailer dict itself ships in the file, so it is scanned like any
-        // other object: repairing a damaged file can park bytes there that no
-        // object pass reaches.
+        // Repairing a damaged file can park bytes in the trailer that no object
+        // pass reaches.
         residual += scan_container_strings(ctx, pdf_trailer(ctx, doc), find, 0);
         // A repaired reopen parses a different structure from the bytes
         // written, so the scans above cannot vouch for those bytes.
@@ -1500,40 +1382,23 @@ int t4_replace(const char *in_path, const char *out_path, const char *find, cons
             page = NULL;
         }
 
-        // Scrub the target from every non-page surface: Info dictionary, outline
-        // titles, annotation and form-field text, and the XMP packet. Only
-        // occurrences of the target change; every other value keeps the same
-        // content. That is not the same as whole-file byte identity: the save
-        // below (do_garbage=3, do_compress=1) is a full, non-incremental
-        // rewrite that renumbers every object and recompresses untouched
-        // streams, so only specific fields -- Info dictionary, XMP, /ID and
-        // header version -- come out byte-identical (asserted in
-        // tests/test_redactor.py; see README.md). Embedded-file streams and
-        // appearance streams are not rewritten here; the verification scan
-        // below catches the target there and fails closed rather than
-        // shipping a file that still contains it.
+        // Embedded-file and appearance streams are not rewritten; the
+        // verification scan catches the target there and fails closed.
         out->matches += scrub_metadata_strings(ctx, doc, find, replace);
         out->matches += scrub_xmp(ctx, doc, find, replace);
-        // Drop any /ToUnicode CMap that still reconstructs exactly the target
-        // after its glyphs were redacted from the page (see
-        // scrub_tounicode_cmaps): a target-subset font's glyph-to-Unicode table
-        // is the last surface the redaction above does not reach.
         out->matches += scrub_tounicode_cmaps(ctx, doc, replace, needle, needle_len);
-        // Drop repair-parked trailer entries the save would otherwise ship.
         sanitize_trailer(ctx, doc);
 
-        // Full non-incremental rewrite: garbage-collects and renumbers every
-        // object and recompresses streams. Field-level content is preserved
-        // for anything not scrubbed above, but the file's bytes are not --
-        // see the comment above and README.md's "What preservation means at
-        // the byte level".
+        // A full, non-incremental rewrite: object numbers and stream encodings
+        // change even where no value did (README.md, "What preservation means
+        // at the byte level").
         pdf_write_options wopts = pdf_default_write_options;
-        wopts.do_garbage = 3;
+        wopts.do_garbage = GARBAGE_DEDUPLICATE;
         wopts.do_compress = 1;
         wopts.do_compress_images = 1;
-        // Keep the original /ID so the file is not flagged as modified.
+        // A regenerated /ID would mark the file as rewritten.
         wopts.dont_regenerate_id = 1;
-        // Do not stamp the MuPDF version into the output.
+        // Keeps the MuPDF version number out of the output.
         wopts.reproducible = 1;
         pdf_save_document(ctx, doc, out_path, &wopts);
     }
@@ -1555,9 +1420,7 @@ int t4_replace(const char *in_path, const char *out_path, const char *find, cons
     }
     pdf_drop_document(ctx, doc);
 
-    // Verify the target no longer appears anywhere in the written file. A scan
-    // that cannot run leaves the output unverified, which is a failure: the file
-    // is removed and a non-zero code returned rather than reporting success.
+    // A scan that cannot run leaves the output unverified, which is a failure.
     int rc = 0;
     fz_try(ctx) { out->residual = verify_residual(ctx, out_path, find, needle, needle_len); }
     fz_catch(ctx) {
@@ -1575,13 +1438,14 @@ int t4_replace(const char *in_path, const char *out_path, const char *find, cons
 
 #ifdef T4_MAIN
 int main(int argc, char **argv) {
-    enum { EXPECTED_ARGC = 5 };
+    enum { ARG_IN = 1, ARG_OUT, ARG_FIND, ARG_REPLACE, EXPECTED_ARGC };
+    enum { EXIT_USAGE = 2 };
     if (argc != EXPECTED_ARGC) {
-        fprintf(stderr, "usage: %s in.pdf out.pdf find replace\n", argv[0]);
-        return 2;
+        (void)fprintf(stderr, "usage: %s in.pdf out.pdf find replace\n", argv[0]);
+        return EXIT_USAGE;
     }
     T4Result r;
-    int rc = t4_replace(argv[1], argv[2], argv[3], argv[4], &r);
+    int rc = t4_replace(argv[ARG_IN], argv[ARG_OUT], argv[ARG_FIND], argv[ARG_REPLACE], &r);
     printf("rc=%d matches=%" PRId64 " pages=%d residual=%" PRId64 " error=%s\n", rc, r.matches,
            r.pages_changed, r.residual, r.error);
     return rc || r.residual ? 1 : 0;

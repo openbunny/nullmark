@@ -221,7 +221,8 @@ def test_scrub_completeness_and_preservation_across_surfaces(
             f"(decoded-string scan); target={target!r}"
         )
         assert any(marker in v for v in out_values), (
-            f"unrelated marker value lost while scrubbing {sorted(surfaces)}; marker={marker!r}"
+            f"unrelated marker value lost while scrubbing {sorted(surfaces)}; "
+            f"marker={marker!r}"
         )
 
         assert pdf.header_version(in_clean) == pdf.header_version(out_clean), (
@@ -261,7 +262,8 @@ def test_empty_target_fails_closed(
             f"empty target counted as residual; stdout={result.stdout!r}"
         )
         assert not out_pdf.exists(), (
-            f"fail-closed violated: output kept for an empty target; stdout={result.stdout!r}"
+            "fail-closed violated: output kept for an empty target; "
+            f"stdout={result.stdout!r}"
         )
         assert "empty" in result.stdout, (
             f"no explanatory error for an empty target; stdout={result.stdout!r}"
