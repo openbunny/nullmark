@@ -70,9 +70,18 @@ static void sanitize_trailer(fz_context *ctx, pdf_document *doc) {
             }
         }
         if (junk == NULL) {
-            return;
+            break;
         }
         pdf_dict_del(ctx, trailer, junk);
+    }
+    // /ID ships as parsed, so it must hold only the two digest strings the
+    // format defines. Repairing an unterminated /ID array absorbs the bytes
+    // that follow it, page text included, and the scrub never reaches them.
+    pdf_obj *id = pdf_dict_get(ctx, trailer, PDF_NAME(ID));
+    if (id != NULL && !(pdf_is_array(ctx, id) && pdf_array_len(ctx, id) == 2 &&
+                        pdf_is_string(ctx, pdf_array_get(ctx, id, 0)) &&
+                        pdf_is_string(ctx, pdf_array_get(ctx, id, 1)))) {
+        fz_throw(ctx, FZ_ERROR_GENERIC, "trailer /ID is not an array of two strings");
     }
 }
 
@@ -1376,6 +1385,11 @@ static int64_t verify_residual(fz_context *ctx, const char *out_path, const char
         // other object: repairing a damaged file can park bytes there that no
         // object pass reaches.
         residual += scan_container_strings(ctx, pdf_trailer(ctx, doc), find, 0);
+        // A repaired reopen parses a different structure from the bytes
+        // written, so the scans above cannot vouch for those bytes.
+        if (pdf_was_repaired(ctx, doc)) {
+            fz_throw(ctx, FZ_ERROR_GENERIC, "the written file needed repair to reopen");
+        }
     }
     fz_always(ctx) {
         fz_free(ctx, find16be);

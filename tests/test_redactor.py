@@ -556,6 +556,17 @@ def test_xref_stream_id_with_nul_byte_scrubs_clean(
     )
 
 
+def test_unterminated_trailer_id_fails_closed(cli_binary: Path, tmp_path: Path) -> None:
+    in_pdf = NULLMARK_DIR / "CTask4PDF" / "fuzz" / "corpus" / "unterminated-id.pdf"
+    out_pdf = tmp_path / "unterminated-id.out.pdf"
+    result = _run_cli(cli_binary, in_pdf, out_pdf)
+    assert _result_fields(result.stdout)["rc"] == 1, (
+        f"malformed trailer /ID accepted; stdout={result.stdout!r}"
+    )
+    assert "trailer /ID" in result.stdout, f"wrong refusal; stdout={result.stdout!r}"
+    assert not out_pdf.exists(), "fail-closed violated: output kept"
+
+
 def test_trailer_junk_scrubs_clean(cli_binary: Path, tmp_path: Path) -> None:
     in_pdf = tmp_path / "trailer.pdf"
     build_trailer_junk_only(in_pdf, TARGET)
