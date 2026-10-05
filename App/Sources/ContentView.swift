@@ -87,13 +87,13 @@ struct ContentView: View {
       Button(action: model.apply) {
         Label("Apply Replacement", systemImage: "wand.and.stars")
       }
-      .buttonStyle(.flat)
+      .buttonStyle(.outline)
       .keyboardShortcut(.return, modifiers: .command)
       .disabled(model.findText.isEmpty || model.isApplying)
       Button(action: model.export) {
         Label("Export PDF…", systemImage: "square.and.arrow.up")
       }
-      .buttonStyle(.flat)
+      .buttonStyle(.outline)
       .keyboardShortcut("s", modifiers: .command)
       .disabled(!model.edited || model.isApplying)
       if let status = model.status {
@@ -134,24 +134,17 @@ struct ContentView: View {
         }
         .padding(Spacing.loose)
     } else {
-      VStack(spacing: Spacing.base) {
-        Image(systemName: dropTargeted ? "arrow.down.doc.fill" : "doc.viewfinder")
-          .accessibilityHidden(true)
-          .font(.themeTitle)
-          .foregroundStyle(Color.sprout)
-        Text("Drop a PDF to begin")
-          .font(.themeTitle)
-          .foregroundStyle(Color.foreground)
-        Text("Its metadata is captured before any change and written back after.")
-          .foregroundStyle(Color.muted)
+      StatusBanner(
+        title: "Drop a PDF to begin",
+        message:
+          "Its metadata is captured before any change and written back after."
+      ) {
         Button(action: model.choose) {
           Label("Choose PDF…", systemImage: "arrow.down.doc")
         }
-        .buttonStyle(.flat)
+        .buttonStyle(.outline)
         .frame(width: 220)
-        .padding(.top, Spacing.tight)
       }
-      .frame(maxWidth: .infinity, maxHeight: .infinity)
       .background(dropTargeted ? Color.paperDeep : Color.clear)
       .animation(reduceMotion ? nil : .default, value: dropTargeted)
     }
@@ -257,13 +250,15 @@ struct ContentView: View {
 private struct Header: View {
   var body: some View {
     HStack(spacing: Spacing.base) {
-      Image(systemName: "character.cursor.ibeam")
+      NullmarkMark()
         .accessibilityHidden(true)
-        .font(.themeTitle)
-        .foregroundStyle(Color.foreground)
         .frame(width: 44, height: 44)
         .background(
-          Color.sproutFill, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous))
+          Color.paper, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
+        )
+        .overlay(
+          RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
+            .strokeBorder(Color.border, lineWidth: Metric.borderWidth))
       VStack(alignment: .leading, spacing: 2) {
         Text("nullmark")
           .font(.themeBody.weight(.bold))
@@ -272,6 +267,29 @@ private struct Header: View {
           .font(.themeCaption)
           .foregroundStyle(Color.muted)
       }
+    }
+  }
+}
+
+struct NullmarkMark: View {
+  var body: some View {
+    GeometryReader { proxy in
+      let side = min(proxy.size.width, proxy.size.height)
+      let unit = side / 1024
+      ZStack {
+        RoundedRectangle(
+          cornerRadius: 40 * unit, style: .continuous
+        )
+        .stroke(Color.foreground, lineWidth: 24 * unit)
+        .frame(width: 400 * unit, height: 640 * unit)
+        .position(x: side / 2, y: side / 2)
+        Rectangle()
+          .fill(Color.sproutFill)
+          .frame(width: 400 * unit, height: 96 * unit)
+          .position(x: side / 2, y: side / 2)
+      }
+      .frame(width: side, height: side)
+      .position(x: proxy.size.width / 2, y: proxy.size.height / 2)
     }
   }
 }
