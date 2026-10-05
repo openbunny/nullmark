@@ -2,9 +2,7 @@
 name = "nullmark-tests"
 version = "0.1.0"
 requires-python = ">=3.12"
-# Test-only project: every dependency below is test tooling. hypothesis is a
-# required import in test_redactor_hypothesis.py; fontTools backs the CID-font
-# fixture in fixtures/generate.py; mypy is the typecheck gate's interpreter.
+# The tests import fonttools and hypothesis; the justfile runs pytest and mypy.
 dependencies = [
   "fonttools==4.65.0",
   "hypothesis==6.168.4",
@@ -12,11 +10,22 @@ dependencies = [
   "pytest==9.1.1",
 ]
 
-[tool.ruff]
-
-# Complexity stays at ruff's built-in default of 10.
-[tool.ruff.lint.mccabe]
-max-complexity = 10
+[tool.ruff.lint]
+select = ["ALL"]
+ignore = [
+  # ruff format owns trailing commas; ruff's documentation lists COM812 as conflicting with it.
+  "COM812",
+  # REUSE.toml assigns copyright and licence to every path.
+  "CPY001",
+  # languages/python.md forbids docstrings.
+  "D",
+  # languages/python.md permits assert in a pytest body and in a helper invariant.
+  "S101",
+  # Every subprocess runs mutool, cc or a CLI this suite builds, with arguments the suite generates.
+  "S603",
+  # mutool and cc resolve from PATH, as they do in the justfile.
+  "S607",
+]
 
 [tool.mypy]
 strict = true
@@ -24,7 +33,6 @@ python_version = "3.12"
 files = [ "." ]
 
 [[tool.mypy.overrides]]
-# fontTools is an optional dependency (README.md): only the CID-font fixture needs it, imported
-# lazily inside a try/except ImportError, and it ships no type stubs.
+# fontTools ships no type stubs.
 module = [ "fontTools.*" ]
 ignore_missing_imports = true

@@ -1,23 +1,33 @@
 from __future__ import annotations
 
 import io
-import os
 import subprocess
+import sys
 import zlib
 from pathlib import Path
 from typing import Final
+
+from fontTools import subset
+from fontTools.fontBuilder import FontBuilder
+from fontTools.pens.ttGlyphPen import TTGlyphPen
+from fontTools.ttLib import TTFont
 
 C_MAX_DECOMPRESSED_STREAM_BYTES: Final = 64 * 1024 * 1024
 C_MAX_CONTAINER_DEPTH: Final = 64
 
 SYSTEM_TTF: Final = Path("/System/Library/Fonts/Supplemental/Arial.ttf")
+FIXTURE_ID: Final = "4e554c4c4d41524b11f1d2c3b4a59687"
+HELVETICA: Final = (
+    b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>"
+)
 
 XMP_TEMPLATE: Final = (
     '<?xpacket begin="﻿" id="W5M0MpCehiHzreSzNTczkc9d"?>\n'
     '<x:xmpmeta xmlns:x="adobe:ns:meta/">\n'
     '<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">\n'
     '<rdf:Description rdf:about="" xmlns:dc="http://purl.org/dc/elements/1.1/">\n'
-    '<dc:title><rdf:Alt><rdf:li xml:lang="x-default">{title}</rdf:li></rdf:Alt></dc:title>\n'
+    '<dc:title><rdf:Alt><rdf:li xml:lang="x-default">{title}</rdf:li>'
+    "</rdf:Alt></dc:title>\n"
     "</rdf:Description>\n</rdf:RDF>\n</x:xmpmeta>\n"
     '<?xpacket end="w"?>'
 )
@@ -34,11 +44,6 @@ def pdf_str(s: str) -> bytes:
 
 
 def text_string_bytes(s: str) -> bytes:
-    data = b"\xfe\xff" + s.encode("utf-16-be")
-    return b"<" + data.hex().encode("ascii") + b">"
-
-
-def pdf_str_utf16(s: str) -> bytes:
     data = b"\xfe\xff" + s.encode("utf-16-be")
     return b"<" + data.hex().encode("ascii") + b">"
 
@@ -61,7 +66,8 @@ def info_dict_bytes(title: str) -> bytes:
 
 class PdfBuilder:
     def __init__(self) -> None:
-        self.objs: list[bytes | None] = []
+        self.objs: list[bytes | None] = [None, None]
+        self.catalog, self.pages = 1, 2
 
     def reserve(self) -> int:
         self.objs.append(None)
@@ -80,7 +86,7 @@ class PdfBuilder:
         return self.add(head + data + b"\nendstream")
 
     def add_flate_stream(self, extra: bytes, data: bytes) -> int:
-        compressed = zlib.compress(data, 9)
+        compressed = zlib.compress(data, zlib.Z_BEST_COMPRESSION)
         head = (
             b"<< "
             + extra
@@ -89,16 +95,10 @@ class PdfBuilder:
         return self.add(head + compressed + b"\nendstream")
 
     def render(
-        self,
-        root: int,
-        info: int,
-        id1: str,
-        id2: str,
-        version: str = "1.7",
-        trailer_extra: bytes = b"",
+        self, root: int, info: int, *, trailer_extra: bytes = b""
     ) -> tuple[bytes, int]:
         assert all(o is not None for o in self.objs), "unset reserved object"
-        buf = bytearray(f"%PDF-{version}\n".encode("latin-1"))
+        buf = bytearray(b"%PDF-1.7\n")
         buf += bytes([0x25, 0xE2, 0xE3, 0xCF, 0xD3, 0x0A])
         offsets = []
         for i, body in enumerate(self.objs, start=1):
@@ -111,24 +111,33 @@ class PdfBuilder:
             buf += f"{off:010d} 00000 n \n".encode("latin-1")
         buf += (
             f"trailer\n<< /Size {len(self.objs) + 1} /Root {root} 0 R /Info {info} 0 R "
-            f"/ID [<{id1}> <{id2}>]".encode("latin-1")
+            f"/ID [<{FIXTURE_ID}> <{FIXTURE_ID}>]".encode("latin-1")
             + trailer_extra
             + f" >>\nstartxref\n{xref_off}\n%%EOF\n".encode("latin-1")
         )
         return bytes(buf), xref_off
 
     def write(
+        self, path: Path, root: int, info: int, *, trailer_extra: bytes = b""
+    ) -> None:
+        data, _ = self.render(root, info, trailer_extra=trailer_extra)
+        path.write_bytes(data)
+
+    def finish(
         self,
         path: Path,
-        root: int,
+        page: int,
         info: int,
-        id1: str,
-        id2: str,
-        version: str = "1.7",
+        *,
+        catalog_extra: str = "",
         trailer_extra: bytes = b"",
     ) -> None:
-        data, _ = self.render(root, info, id1, id2, version, trailer_extra)
-        path.write_bytes(data)
+        self.set(self.pages, f"<< /Type /Pages /Kids [{page} 0 R] /Count 1 >>".encode())
+        self.set(
+            self.catalog,
+            f"<< /Type /Catalog /Pages {self.pages} 0 R{catalog_extra} >>".encode(),
+        )
+        self.write(path, self.catalog, info, trailer_extra=trailer_extra)
 
 
 def _page_dict(
@@ -144,17 +153,10 @@ def _page_dict(
 BENIGN_BODY: Final = b"BT /F1 18 Tf 72 700 Td (Body text with no target.) Tj ET"
 
 
-def _helvetica() -> bytes:
-    return b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>"
-
-
 def build_simple(path: Path, target: str) -> None:
     b = PdfBuilder()
-    catalog = b.reserve()
-    pages = b.reserve()
-    font = b.add(
-        b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>"
-    )
+    catalog, pages = b.catalog, b.pages
+    font = b.add(HELVETICA)
     content = b.add_stream(
         b"",
         b"BT /F1 18 Tf 72 700 Td "
@@ -171,17 +173,13 @@ def build_simple(path: Path, target: str) -> None:
         catalog,
         f"<< /Type /Catalog /Pages {pages} 0 R /Metadata {metadata} 0 R >>".encode(),
     )
-    id1 = os.urandom(16).hex()
-    b.write(path, catalog, info, id1, id1)
+    b.write(path, catalog, info)
 
 
 def build_multipage(path: Path, target: str, n_pages: int = 3) -> None:
     b = PdfBuilder()
-    catalog = b.reserve()
-    pages = b.reserve()
-    font = b.add(
-        b"<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica /Encoding /WinAnsiEncoding >>"
-    )
+    catalog, pages = b.catalog, b.pages
+    font = b.add(HELVETICA)
     page_refs = []
     for i in range(1, n_pages + 1):
         content = b.add_stream(
@@ -201,34 +199,13 @@ def build_multipage(path: Path, target: str, n_pages: int = 3) -> None:
         catalog,
         f"<< /Type /Catalog /Pages {pages} 0 R /Metadata {metadata} 0 R >>".encode(),
     )
-    id1 = os.urandom(16).hex()
-    b.write(path, catalog, info, id1, id1)
-
-
-def _finish(
-    b: PdfBuilder,
-    path: Path,
-    catalog: int,
-    pages: int,
-    page: int,
-    info: int,
-    catalog_extra: str = "",
-    trailer_extra: bytes = b"",
-) -> None:
-    b.set(pages, f"<< /Type /Pages /Kids [{page} 0 R] /Count 1 >>".encode())
-    b.set(
-        catalog,
-        f"<< /Type /Catalog /Pages {pages} 0 R{catalog_extra} >>".encode(),
-    )
-    id1 = os.urandom(16).hex()
-    b.write(path, catalog, info, id1, id1, trailer_extra=trailer_extra)
+    b.write(path, catalog, info)
 
 
 def build_info_only(path: Path, target: str) -> None:
     b = PdfBuilder()
-    catalog = b.reserve()
-    pages = b.reserve()
-    font = b.add(_helvetica())
+    pages = b.pages
+    font = b.add(HELVETICA)
     content = b.add_stream(b"", BENIGN_BODY)
     page = b.add(_page_dict(pages, "F1", font, content))
     info = b.add(
@@ -248,28 +225,26 @@ def build_info_only(path: Path, target: str) -> None:
         + pdf_str(target)
         + b" /CreationDate (D:20240101000000Z) >>"
     )
-    _finish(b, path, catalog, pages, page, info)
+    b.finish(path, page, info)
 
 
 def build_xmp_only(path: Path, target: str) -> None:
     b = PdfBuilder()
-    catalog = b.reserve()
-    pages = b.reserve()
-    font = b.add(_helvetica())
+    pages = b.pages
+    font = b.add(HELVETICA)
     content = b.add_stream(b"", BENIGN_BODY)
     page = b.add(_page_dict(pages, "F1", font, content))
     metadata = b.add_stream(
         b"/Type /Metadata /Subtype /XML", xmp_bytes(f"Statement for {target}")
     )
     info = b.add(info_dict_bytes("Nullmark xmp fixture"))
-    _finish(b, path, catalog, pages, page, info, f" /Metadata {metadata} 0 R")
+    b.finish(path, page, info, catalog_extra=f" /Metadata {metadata} 0 R")
 
 
 def build_outline_only(path: Path, target: str) -> None:
     b = PdfBuilder()
-    catalog = b.reserve()
-    pages = b.reserve()
-    font = b.add(_helvetica())
+    pages = b.pages
+    font = b.add(HELVETICA)
     content = b.add_stream(b"", BENIGN_BODY)
     page = b.add(_page_dict(pages, "F1", font, content))
     outlines = b.reserve()
@@ -287,14 +262,13 @@ def build_outline_only(path: Path, target: str) -> None:
         f"<< /Type /Outlines /First {item} 0 R /Last {item} 0 R /Count 1 >>".encode(),
     )
     info = b.add(info_dict_bytes("Nullmark outline fixture"))
-    _finish(b, path, catalog, pages, page, info, f" /Outlines {outlines} 0 R")
+    b.finish(path, page, info, catalog_extra=f" /Outlines {outlines} 0 R")
 
 
 def build_annotation_only(path: Path, target: str) -> None:
     b = PdfBuilder()
-    catalog = b.reserve()
-    pages = b.reserve()
-    font = b.add(_helvetica())
+    pages = b.pages
+    font = b.add(HELVETICA)
     content = b.add_stream(b"", BENIGN_BODY)
     annot = b.add(
         b"<< /Type /Annot /Subtype /Text /Rect [72 700 92 720] /Contents "
@@ -307,14 +281,13 @@ def build_annotation_only(path: Path, target: str) -> None:
         _page_dict(pages, "F1", font, content, extra=f" /Annots [{annot} 0 R]")
     )
     info = b.add(info_dict_bytes("Nullmark annotation fixture"))
-    _finish(b, path, catalog, pages, page, info)
+    b.finish(path, page, info)
 
 
 def build_field_only(path: Path, target: str) -> None:
     b = PdfBuilder()
-    catalog = b.reserve()
-    pages = b.reserve()
-    font = b.add(_helvetica())
+    pages = b.pages
+    font = b.add(HELVETICA)
     content = b.add_stream(b"", BENIGN_BODY)
     field = b.reserve()
     page = b.add(
@@ -334,16 +307,15 @@ def build_field_only(path: Path, target: str) -> None:
     )
     acroform = b.add(f"<< /Fields [{field} 0 R] /NeedAppearances true >>".encode())
     info = b.add(info_dict_bytes("Nullmark field fixture"))
-    _finish(b, path, catalog, pages, page, info, f" /AcroForm {acroform} 0 R")
+    b.finish(path, page, info, catalog_extra=f" /AcroForm {acroform} 0 R")
 
 
 def build_deep_nesting(
     path: Path, target: str, depth: int = C_MAX_CONTAINER_DEPTH + 36
 ) -> None:
     b = PdfBuilder()
-    catalog = b.reserve()
-    pages = b.reserve()
-    font = b.add(_helvetica())
+    pages = b.pages
+    font = b.add(HELVETICA)
     content = b.add_stream(b"", BENIGN_BODY)
     page = b.add(_page_dict(pages, "F1", font, content))
     info = b.add(info_dict_bytes("Nullmark deep-nesting fixture"))
@@ -351,20 +323,19 @@ def build_deep_nesting(
     for _ in range(depth):
         nested = b"[" + nested + b"]"
     b.add(nested)
-    _finish(b, path, catalog, pages, page, info)
+    b.finish(path, page, info)
 
 
 def build_oversized_xmp(path: Path) -> None:
     b = PdfBuilder()
-    catalog = b.reserve()
-    pages = b.reserve()
-    font = b.add(_helvetica())
+    pages = b.pages
+    font = b.add(HELVETICA)
     content = b.add_stream(b"", BENIGN_BODY)
     page = b.add(_page_dict(pages, "F1", font, content))
     oversized = b"A" * (C_MAX_DECOMPRESSED_STREAM_BYTES + 1024)
     metadata = b.add_flate_stream(b"/Type /Metadata /Subtype /XML", oversized)
     info = b.add(info_dict_bytes("Nullmark oversized-xmp fixture"))
-    _finish(b, path, catalog, pages, page, info, f" /Metadata {metadata} 0 R")
+    b.finish(path, page, info, catalog_extra=f" /Metadata {metadata} 0 R")
 
 
 COMBO_SURFACES: Final = frozenset({"info", "xmp", "outline", "annotation", "field"})
@@ -379,9 +350,8 @@ def build_combo(
     repeated = f" {marker} ".join([target] * occurrences)
 
     b = PdfBuilder()
-    catalog = b.reserve()
-    pages = b.reserve()
-    font = b.add(_helvetica())
+    catalog, pages = b.catalog, b.pages
+    font = b.add(HELVETICA)
     content = b.add_stream(b"", BENIGN_BODY)
 
     field_ref = b.reserve() if "field" in surfaces else None
@@ -425,7 +395,8 @@ def build_combo(
         )
         b.set(
             outlines,
-            f"<< /Type /Outlines /First {item} 0 R /Last {item} 0 R /Count 1 >>".encode(),
+            f"<< /Type /Outlines /First {item} 0 R /Last {item} 0 R /Count 1 "
+            ">>".encode(),
         )
         catalog_extra += f" /Outlines {outlines} 0 R"
 
@@ -456,15 +427,13 @@ def build_combo(
 
     b.set(pages, f"<< /Type /Pages /Kids [{page} 0 R] /Count 1 >>".encode())
     b.set(catalog, f"<< /Type /Catalog /Pages {pages} 0 R{catalog_extra} >>".encode())
-    id1 = os.urandom(16).hex()
-    b.write(path, catalog, info, id1, id1)
+    b.write(path, catalog, info)
 
 
 def build_embedded_only(path: Path, target: str) -> None:
     b = PdfBuilder()
-    catalog = b.reserve()
-    pages = b.reserve()
-    font = b.add(_helvetica())
+    pages = b.pages
+    font = b.add(HELVETICA)
     content = b.add_stream(b"", BENIGN_BODY)
     page = b.add(_page_dict(pages, "F1", font, content))
     payload = f"Account holder: {target}\nBalance: 100 USD\n".encode("latin-1")
@@ -477,7 +446,7 @@ def build_embedded_only(path: Path, target: str) -> None:
         + f"{filespec} 0 R] >> >>".encode()
     )
     info = b.add(info_dict_bytes("Nullmark embedded fixture"))
-    _finish(b, path, catalog, pages, page, info, f" /Names {names} 0 R")
+    b.finish(path, page, info, catalog_extra=f" /Names {names} 0 R")
 
 
 def build_compressed_objstm(path: Path, target: str) -> None:
@@ -492,9 +461,8 @@ def build_compressed_objstm(path: Path, target: str) -> None:
 
 def build_appearance_stream_only(path: Path, target: str) -> None:
     b = PdfBuilder()
-    catalog = b.reserve()
-    pages = b.reserve()
-    font = b.add(_helvetica())
+    pages = b.pages
+    font = b.add(HELVETICA)
     content = b.add_stream(b"", BENIGN_BODY)
     ap_content = b"q BT /F1 12 Tf 0 10 Td " + pdf_str(f"Signed: {target}") + b" Tj ET Q"
     ap_resources = (
@@ -511,31 +479,29 @@ def build_appearance_stream_only(path: Path, target: str) -> None:
         _page_dict(pages, "F1", font, content, extra=f" /Annots [{annot} 0 R]")
     )
     info = b.add(info_dict_bytes("Nullmark appearance fixture"))
-    _finish(b, path, catalog, pages, page, info)
+    b.finish(path, page, info)
 
 
 def build_astral_info_only(path: Path, target: str) -> None:
     b = PdfBuilder()
-    catalog = b.reserve()
-    pages = b.reserve()
-    font = b.add(_helvetica())
+    pages = b.pages
+    font = b.add(HELVETICA)
     content = b.add_stream(b"", BENIGN_BODY)
     page = b.add(_page_dict(pages, "F1", font, content))
     info = b.add(
         b"<< /Title "
         + pdf_str("Nullmark astral info fixture")
         + b" /Author "
-        + pdf_str_utf16(target)
+        + text_string_bytes(target)
         + b" /CreationDate (D:20240101000000Z) >>"
     )
-    _finish(b, path, catalog, pages, page, info)
+    b.finish(path, page, info)
 
 
 def build_incremental_update(path: Path, target: str) -> None:
     b = PdfBuilder()
-    catalog = b.reserve()
-    pages = b.reserve()
-    font = b.add(_helvetica())
+    catalog, pages = b.catalog, b.pages
+    font = b.add(HELVETICA)
     content = b.add_stream(b"", BENIGN_BODY)
     page = b.add(_page_dict(pages, "F1", font, content))
     info = b.add(
@@ -547,8 +513,7 @@ def build_incremental_update(path: Path, target: str) -> None:
     )
     b.set(pages, f"<< /Type /Pages /Kids [{page} 0 R] /Count 1 >>".encode())
     b.set(catalog, f"<< /Type /Catalog /Pages {pages} 0 R >>".encode())
-    id1 = os.urandom(16).hex()
-    base, base_xref_off = b.render(catalog, info, id1, id1)
+    base, base_xref_off = b.render(catalog, info)
 
     clean_info = (
         b"<< /Title "
@@ -566,16 +531,16 @@ def build_incremental_update(path: Path, target: str) -> None:
     buf += f"{upd_off:010d} 00000 n \n".encode("latin-1")
     buf += (
         f"trailer\n<< /Size {size} /Root {catalog} 0 R /Info {info} 0 R "
-        f"/ID [<{id1}> <{id1}>] /Prev {base_xref_off} >>\nstartxref\n{xref_off}\n%%EOF\n"
+        f"/ID [<{FIXTURE_ID}> <{FIXTURE_ID}>] /Prev {base_xref_off} "
+        f">>\nstartxref\n{xref_off}\n%%EOF\n"
     ).encode("latin-1")
     path.write_bytes(bytes(buf))
 
 
 def build_kitchen_sink(path: Path, target: str) -> None:
     b = PdfBuilder()
-    catalog = b.reserve()
-    pages = b.reserve()
-    font = b.add(_helvetica())
+    catalog, pages = b.catalog, b.pages
+    font = b.add(HELVETICA)
     content = b.add_stream(
         b"",
         b"BT /F1 18 Tf 72 700 Td "
@@ -646,15 +611,13 @@ def build_kitchen_sink(path: Path, target: str) -> None:
             f"/Outlines {outlines} 0 R /AcroForm {acroform} 0 R >>"
         ).encode(),
     )
-    id1 = os.urandom(16).hex()
-    b.write(path, catalog, info, id1, id1)
+    b.write(path, catalog, info)
 
 
 def build_name_value_only(path: Path, target: str) -> None:
     b = PdfBuilder()
-    catalog = b.reserve()
-    pages = b.reserve()
-    font = b.add(_helvetica())
+    pages = b.pages
+    font = b.add(HELVETICA)
     content = b.add_stream(b"", BENIGN_BODY)
     page = b.add(_page_dict(pages, "F1", font, content))
     info = b.add(
@@ -668,14 +631,13 @@ def build_name_value_only(path: Path, target: str) -> None:
         + target.encode("latin-1")
         + b" /CreationDate (D:20240101000000Z) >>"
     )
-    _finish(b, path, catalog, pages, page, info)
+    b.finish(path, page, info)
 
 
 def build_nul_string_only(path: Path, target: str) -> None:
     b = PdfBuilder()
-    catalog = b.reserve()
-    pages = b.reserve()
-    font = b.add(_helvetica())
+    pages = b.pages
+    font = b.add(HELVETICA)
     content = b.add_stream(b"", BENIGN_BODY)
     page = b.add(_page_dict(pages, "F1", font, content))
     info = b.add(
@@ -686,14 +648,13 @@ def build_nul_string_only(path: Path, target: str) -> None:
         + b")"
         + b" /CreationDate (D:20240101000000Z) >>"
     )
-    _finish(b, path, catalog, pages, page, info)
+    b.finish(path, page, info)
 
 
 def build_nul_name_only(path: Path, target: str) -> None:
     b = PdfBuilder()
-    catalog = b.reserve()
-    pages = b.reserve()
-    font = b.add(_helvetica())
+    pages = b.pages
+    font = b.add(HELVETICA)
     content = b.add_stream(b"", BENIGN_BODY)
     page = b.add(_page_dict(pages, "F1", font, content))
     info = b.add(
@@ -703,22 +664,18 @@ def build_nul_name_only(path: Path, target: str) -> None:
         + target.encode("latin-1")
         + b" /CreationDate (D:20240101000000Z) >>"
     )
-    _finish(b, path, catalog, pages, page, info)
+    b.finish(path, page, info)
 
 
 def build_trailer_junk_only(path: Path, target: str) -> None:
     b = PdfBuilder()
-    catalog = b.reserve()
-    pages = b.reserve()
-    font = b.add(_helvetica())
+    pages = b.pages
+    font = b.add(HELVETICA)
     content = b.add_stream(b"", BENIGN_BODY)
     page = b.add(_page_dict(pages, "F1", font, content))
     info = b.add(info_dict_bytes("Nullmark trailer fixture"))
-    _finish(
-        b,
+    b.finish(
         path,
-        catalog,
-        pages,
         page,
         info,
         trailer_extra=b" /Junk << /Title " + pdf_str(target) + b" >>",
@@ -727,9 +684,8 @@ def build_trailer_junk_only(path: Path, target: str) -> None:
 
 def build_key_only(path: Path, target: str) -> None:
     b = PdfBuilder()
-    catalog = b.reserve()
-    pages = b.reserve()
-    font = b.add(_helvetica())
+    pages = b.pages
+    font = b.add(HELVETICA)
     content = b.add_stream(b"", BENIGN_BODY)
     page = b.add(_page_dict(pages, "F1", font, content))
     info = b.add(
@@ -740,14 +696,13 @@ def build_key_only(path: Path, target: str) -> None:
         + b" (benign)"
         + b" /CreationDate (D:20240101000000Z) >>"
     )
-    _finish(b, path, catalog, pages, page, info)
+    b.finish(path, page, info)
 
 
 def build_embedded_utf16le_only(path: Path, target: str) -> None:
     b = PdfBuilder()
-    catalog = b.reserve()
-    pages = b.reserve()
-    font = b.add(_helvetica())
+    pages = b.pages
+    font = b.add(HELVETICA)
     content = b.add_stream(b"", BENIGN_BODY)
     page = b.add(_page_dict(pages, "F1", font, content))
     payload = f"{target} on file\nBalance: 100 USD\n".encode("utf-16-le")
@@ -760,7 +715,7 @@ def build_embedded_utf16le_only(path: Path, target: str) -> None:
         + f"{filespec} 0 R] >> >>".encode()
     )
     info = b.add(info_dict_bytes("Nullmark embedded utf16le fixture"))
-    _finish(b, path, catalog, pages, page, info, f" /Names {names} 0 R")
+    b.finish(path, page, info, catalog_extra=f" /Names {names} 0 R")
 
 
 def _tounicode_cmap(entries: set[tuple[int, int]]) -> bytes:
@@ -775,13 +730,7 @@ def _tounicode_cmap(entries: set[tuple[int, int]]) -> bytes:
     ).encode()
 
 
-def build_cidfont(path: Path, target: str) -> bool:
-    try:
-        from fontTools.fontBuilder import FontBuilder
-        from fontTools.pens.ttGlyphPen import TTGlyphPen
-    except ImportError:
-        return False
-
+def build_cidfont(path: Path, target: str) -> None:
     glyph_names: dict[str, str] = {}
     glyph_order = [".notdef"]
     for c in target:
@@ -791,9 +740,8 @@ def build_cidfont(path: Path, target: str) -> bool:
 
     box = TTGlyphPen(None)
     box.moveTo((50, 0))
-    box.lineTo((50, 700))
-    box.lineTo((450, 700))
-    box.lineTo((450, 0))
+    for corner in ((50, 700), (450, 700), (450, 0)):
+        box.lineTo(corner)
     box.closePath()
     box_glyph = box.glyph()
 
@@ -824,8 +772,7 @@ def build_cidfont(path: Path, target: str) -> bool:
     font_bytes = buf.getvalue()
 
     b = PdfBuilder()
-    catalog = b.reserve()
-    pages = b.reserve()
+    catalog, pages = b.catalog, b.pages
     page = b.reserve()
 
     font_file = b.add_stream(f"/Length1 {len(font_bytes)}".encode(), font_bytes)
@@ -841,14 +788,16 @@ def build_cidfont(path: Path, target: str) -> bool:
         (
             "<< /Type /Font /Subtype /CIDFontType2 /BaseFont /NullmarkTestSubset "
             "/CIDSystemInfo << /Registry (Adobe) /Ordering (Identity) /Supplement 0 >> "
-            f"/FontDescriptor {descriptor} 0 R /DW 0 /W [{w_entries}] /CIDToGIDMap /Identity >>"
+            f"/FontDescriptor {descriptor} 0 R /DW 0 /W [{w_entries}] /CIDToGIDMap "
+            "/Identity >>"
         ).encode()
     )
     tounicode = b.add_stream(b"", _tounicode_cmap({(gids[c], ord(c)) for c in target}))
     type0 = b.add(
         (
             "<< /Type /Font /Subtype /Type0 /BaseFont /NullmarkTestSubset "
-            f"/Encoding /Identity-H /DescendantFonts [{cidfont} 0 R] /ToUnicode {tounicode} 0 R >>"
+            f"/Encoding /Identity-H /DescendantFonts [{cidfont} 0 R] /ToUnicode "
+            f"{tounicode} 0 R >>"
         ).encode()
     )
     hex_codes = "".join(f"{gids[c]:04X}" for c in target)
@@ -863,17 +812,10 @@ def build_cidfont(path: Path, target: str) -> bool:
         catalog,
         f"<< /Type /Catalog /Pages {pages} 0 R /Metadata {metadata} 0 R >>".encode(),
     )
-    id1 = os.urandom(16).hex()
-    b.write(path, catalog, info, id1, id1)
-    return True
+    b.write(path, catalog, info)
 
 
 def build_hidden_cid_annotation(path: Path, target: str) -> bool:
-    try:
-        from fontTools import subset
-        from fontTools.ttLib import TTFont
-    except ImportError:
-        return False
     if not SYSTEM_TTF.exists():
         return False
 
@@ -900,11 +842,10 @@ def build_hidden_cid_annotation(path: Path, target: str) -> bool:
     font_bytes = buf.getvalue()
 
     b = PdfBuilder()
-    catalog = b.reserve()
-    pages = b.reserve()
+    catalog, pages = b.catalog, b.pages
     page = b.reserve()
 
-    pfont = b.add(_helvetica())
+    pfont = b.add(HELVETICA)
     pcontent = b.add_stream(b"", BENIGN_BODY)
 
     font_file = b.add_stream(f"/Length1 {len(font_bytes)}".encode(), font_bytes)
@@ -920,7 +861,8 @@ def build_hidden_cid_annotation(path: Path, target: str) -> bool:
         (
             "<< /Type /Font /Subtype /CIDFontType2 /BaseFont /NullmarkHiddenSubset "
             "/CIDSystemInfo << /Registry (Adobe) /Ordering (Identity) /Supplement 0 >> "
-            f"/FontDescriptor {descriptor} 0 R /DW 0 /W [{w_entries}] /CIDToGIDMap /Identity >>"
+            f"/FontDescriptor {descriptor} 0 R /DW 0 /W [{w_entries}] /CIDToGIDMap "
+            "/Identity >>"
         ).encode()
     )
     type0 = b.add(
@@ -956,8 +898,7 @@ def build_hidden_cid_annotation(path: Path, target: str) -> bool:
         catalog,
         f"<< /Type /Catalog /Pages {pages} 0 R /Metadata {metadata} 0 R >>".encode(),
     )
-    id1 = os.urandom(16).hex()
-    b.write(path, catalog, info, id1, id1)
+    b.write(path, catalog, info)
     return True
 
 
@@ -970,13 +911,13 @@ def generate_all(out_dir: Path, target: str = "OLDNAME") -> dict[str, Path | Non
     )
     build_simple(simple, target)
     build_multipage(multipage, target)
-    built = build_cidfont(cidfont, target)
+    build_cidfont(cidfont, target)
     hidden_cid_annot = out_dir / "hidden_cid_annot.pdf"
     built_hidden_cid_annot = build_hidden_cid_annotation(hidden_cid_annot, target)
     surfaces: dict[str, Path | None] = {
         "simple": simple,
         "multipage": multipage,
-        "cidfont": cidfont if built else None,
+        "cidfont": cidfont,
         "hidden_cid_annot": hidden_cid_annot if built_hidden_cid_annot else None,
     }
     builders = {
@@ -999,10 +940,10 @@ def generate_all(out_dir: Path, target: str = "OLDNAME") -> dict[str, Path | Non
 
 
 if __name__ == "__main__":
-    import sys
-
     out = generate_all(
         Path(sys.argv[1]) if len(sys.argv) > 1 else Path.cwd() / "_generated"
     )
-    for name, p in out.items():
-        print(name, p if p else "SKIPPED (fontTools/system font unavailable)")
+    sys.stdout.writelines(
+        f"{name} {p or 'SKIPPED (system TrueType font unavailable)'}\n"
+        for name, p in out.items()
+    )

@@ -1,22 +1,13 @@
 #!/usr/bin/env bash
-# Regression guard for the redaction-placement fix in task4pdf.c.
+# Builds the hardened CLI and runs tests/verify_redaction.py against it under
+# sandbox/nullmark-cli.sb, so the gate proves a redaction succeeds inside that
+# containment. pytest builds its own unhardened, unsandboxed CLI, so neither
+# property is covered there.
 #
-# The stext quads collect_matches records are in transformed page space.
-# pdf_set_annot_rect applies the inverse page transform itself, so the rect
-# must be passed in that transformed space. An earlier version inverted the
-# quads a second time by hand; that double inverse mirrored the /Redact
-# annotation across the page's vertical centre, so any run not near centre
-# survived redaction (residual > 0). This fixture places the target at y=700
-# on a 792pt page (far from centre) to catch a re-introduction of that bug.
-#
-# Base-14 and 3-page cases run standalone here (no fontTools). The Type0/CID
-# case and the byte-level Info/XMP/ID assertions live in the pytest harness
-# (tests/test_redactor.py): run that for full coverage. The fixture builder
-# and the per-case checks are tests/verify_redaction.py.
-#
-# The CLI runs under sandbox/nullmark-cli.sb (network denied, filesystem limited
-# to the two paths of the run) so this gate also confirms redaction still
-# succeeds under that containment, not just that the Seatbelt profile builds.
+# Both fixtures place the target at y=700 on a 792 pt page, far from the
+# vertical centre: passing the stext quads through the inverse page transform a
+# second time mirrors the /Redact annotation across that centre, and the target
+# then survives.
 set -euo pipefail
 
 here="$(cd "$(dirname "$0")" && pwd)"
@@ -25,12 +16,10 @@ lib=/opt/homebrew/lib
 work="$(mktemp -d "${TMPDIR:-/tmp}/t4verify.XXXXXX")"
 trap 'rm -rf "$work"' EXIT
 
-# Hardening flags match the justfile's `harden` set. -O2 is required for
-# _FORTIFY_SOURCE=2 to engage: without optimization the fortified libc variants
-# are not substituted and the flag is inert.
+# Matches the justfile's `harden` flags; -O2 is what engages _FORTIFY_SOURCE.
 cc -DT4_MAIN -std=c11 -O2 -fstack-protector-strong -D_FORTIFY_SOURCE=2 -fPIE \
         -I "$here/include" -I "$inc" -L "$lib" \
         -Wl,-rpath,"$lib" "$here/task4pdf.c" -lmupdf -o "$work/cli"
 
-python3 "$here/../tests/verify_redaction.py" "$work" "$here"
+uv run --project "$here/../tests" --frozen python "$here/../tests/verify_redaction.py" "$work" "$here"
 echo "verify-redaction: all cases passed"

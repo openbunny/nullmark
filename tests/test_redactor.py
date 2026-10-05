@@ -127,8 +127,7 @@ def test_replace_preserves_metadata(
     name: str, cli_binary: Path, fixture_pdfs: dict[str, Path | None], tmp_path: Path
 ) -> None:
     in_pdf = fixture_pdfs[name]
-    if in_pdf is None:
-        pytest.skip(f"{name} fixture unavailable (fontTools is not installed)")
+    assert in_pdf is not None, f"{name} fixture was not generated"
 
     out_pdf = tmp_path / f"{name}.out.pdf"
     result = subprocess.run(
@@ -138,12 +137,14 @@ def test_replace_preserves_metadata(
         check=False,
     )
     assert out_pdf.exists(), (
-        f"CLI produced no output file; stdout={result.stdout!r} stderr={result.stderr!r}"
+        f"CLI produced no output file; stdout={result.stdout!r} "
+        f"stderr={result.stderr!r}"
     )
 
     extracted = _extract_text(out_pdf)
     assert TARGET not in extracted, (
-        f"target text still present after redaction (zero-residual requirement violated): "
+        "target text still present after redaction (zero-residual requirement "
+        "violated): "
         f"{extracted!r}; CLI stdout={result.stdout!r}"
     )
     assert REPLACEMENT in extracted, (
@@ -157,9 +158,12 @@ def test_replace_preserves_metadata(
     )
     assert not re.search(rb"MuPDF[ \t]+\d", raw_out, re.IGNORECASE), (
         "output must not carry a MuPDF version string "
-        "(checked on the CLI's raw output, not on a `mutool clean` copy). MuPDF's own save "
-        "always stamps a versionless '% Written by MuPDF' product comment that the supported "
-        "save API cannot suppress, so only a 'MuPDF <digit>' version pattern is rejected)"
+        "(checked on the CLI's raw output, not on a `mutool clean` copy). MuPDF's own "
+        "save "
+        "always stamps a versionless '% Written by MuPDF' product comment that the "
+        "supported "
+        "save API cannot suppress, so only a 'MuPDF <digit>' version pattern is "
+        "rejected)"
     )
 
     in_text = _clean(in_pdf, tmp_path / f"{name}.in.clean.pdf")
@@ -253,8 +257,12 @@ def test_scrub_removes_target_from_surface(
         for key, expected in UNRELATED_INFO_FIELDS.items():
             in_m = re.search(rf"/{key}\s*(\(.*?\)|<.*?>)", in_info)
             out_m = re.search(rf"/{key}\s*(\(.*?\)|<.*?>)", out_info)
-            assert in_m and in_m.group(1) == expected, (
-                f"fixture setup: /{key} not {expected!r} in input Info dict: {in_info!r}"
+            assert in_m, (
+                f"fixture setup: /{key} missing from input Info dict: {in_info!r}"
+            )
+            assert in_m.group(1) == expected, (
+                f"fixture setup: /{key} not {expected!r} in input Info dict: "
+                f"{in_info!r}"
             )
             assert out_m, f"/{key} missing from output Info dict: {out_info!r}"
             assert out_m.group(1) == in_m.group(1), (
@@ -314,7 +322,8 @@ def test_oversized_stream_fails_closed(cli_binary: Path, tmp_path: Path) -> None
 
     assert result.returncode != 0, (
         f"CLI must fail closed on a stream that decompresses past the size cap "
-        f"instead of decompressing it unconditionally; {result.stdout!r} {result.stderr!r}"
+        f"instead of decompressing it unconditionally; {result.stdout!r} "
+        f"{result.stderr!r}"
     )
     assert not out_pdf.exists(), (
         "fail-closed violated: output kept despite an oversized decompressed stream"
@@ -372,7 +381,8 @@ def test_incremental_update_remnants_dropped(cli_binary: Path, tmp_path: Path) -
     raw_out = out_pdf.read_bytes()
     assert TARGET.encode() not in raw_out, (
         "the stale, no-longer-live incremental-update revision's target bytes survive "
-        "in the raw output (independent of verify_residual, which only sees live values)"
+        "in the raw output (independent of verify_residual, which only sees live "
+        "values)"
     )
     assert raw_out.count(b"%%EOF") == 1, "output must have exactly one %%EOF"
     assert b"/Prev" not in raw_out, (
@@ -589,8 +599,7 @@ def test_cidfont_fixture_builds_without_any_installed_font(
 ) -> None:
     with monkeypatch.context() as m:
         m.setattr(Path, "exists", lambda _self: False)
-        ok = build_cidfont(tmp_path / "cidfont.pdf", TARGET)
-    assert ok, "cidfont fixture must build without depending on any installed font"
+        build_cidfont(tmp_path / "cidfont.pdf", TARGET)
     out = tmp_path / "cidfont.pdf"
     assert out.read_bytes().startswith(b"%PDF-"), "cidfont fixture was not written"
 
@@ -622,7 +631,8 @@ def test_utf16le_embedded_target_fails_closed(
         f"UTF-16LE embedded target not counted as residual; {result.stdout!r}"
     )
     assert not out_pdf.exists(), (
-        "fail-closed violated: output kept while a UTF-16LE-only embedded target survives"
+        "fail-closed violated: output kept while a UTF-16LE-only embedded target "
+        "survives"
     )
 
 
@@ -632,7 +642,8 @@ def test_hidden_cid_annotation_fails_closed(
     in_pdf = fixture_pdfs["hidden_cid_annot"]
     if in_pdf is None:
         pytest.skip(
-            "hidden_cid_annot fixture unavailable (fontTools or a system TrueType font is missing)"
+            "hidden_cid_annot fixture unavailable: the system TrueType font is "
+            "missing or lacks the target's glyphs"
         )
 
     out_pdf = tmp_path / "hidden_cid_annot.out.pdf"
@@ -640,11 +651,13 @@ def test_hidden_cid_annotation_fails_closed(
 
     fields = _result_fields(result.stdout)
     assert result.returncode != 0, (
-        f"CLI reported success on a hidden CID-font annotation target; {result.stdout!r}"
+        "CLI reported success on a hidden CID-font annotation target; "
+        f"{result.stdout!r}"
     )
     assert fields["residual"] >= 1, (
         f"hidden CID-font annotation target not counted as residual; {result.stdout!r}"
     )
     assert not out_pdf.exists(), (
-        "fail-closed violated: output kept while a hidden CID-font annotation target survives"
+        "fail-closed violated: output kept while a hidden CID-font annotation target "
+        "survives"
     )
