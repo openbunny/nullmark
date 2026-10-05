@@ -42,6 +42,7 @@ ci-check: install
 install:
     mise install
     cd tests && uv sync --frozen
+    lefthook install
 
 # No runner here continues past a failing gate and reports every failure together.
 _all gates:

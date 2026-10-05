@@ -3,6 +3,10 @@ pre-commit:
   commands:
     fmt-check:
       run: just fmt-check
+    lint:
+      run: just lint
+    typecheck:
+      run: just typecheck
     secrets:
       run: just secrets
 
