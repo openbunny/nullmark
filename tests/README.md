@@ -8,13 +8,9 @@ Tests for `t4_replace` in `../CTask4PDF/task4pdf.c`, run against the standalone
 MuPDF must be installed as a workstation tool, with its headers,
 library, and `mutool` available.
 
-`test_redactor.py` locates MuPDF's headers and libraries via `pkg-config`,
-then `brew --prefix mupdf`, then the two conventional prefixes
-(`mupdf_discovery.py`), and also needs a `cc` and `mutool` on `PATH`. If none
-of that is found, the whole module is skipped at collection time with a
-message naming what is missing — it does not fail, unless `NULLMARK_REQUIRE_MUPDF`
-is set (as `just test` does), in which case it is an error instead. See
-`test_mupdf_discovery.py` for discovery's own unit tests.
+The suite builds the CLI against MuPDF under `/opt/homebrew` with the
+hardened flags and `-Werror` (`conftest.py`), and needs `cc` and `mutool` on
+`PATH`. A missing MuPDF fails the build; the suite never skips it.
 
 Python dependencies (pytest, hypothesis, fontTools, mypy) are pinned in
 `pyproject.toml`/`uv.lock`. `just install` syncs them into `tests/.venv`, and
@@ -197,8 +193,9 @@ Further coverage beyond the surfaces above:
 `pdf_set_annot_rect` already applies the inverse page transform, so
 transforming the quad a second time places the redaction away from the text
 for any run not near the vertical centre of the page.
-`CTask4PDF/verify-redaction.sh` guards that placement with fixtures far from
-the centre, and `just test` runs it after this suite.
+The `simple` and `multipage` fixtures draw their text at y=700 on a 792 pt
+page, far from the centre, so `test_replace_preserves_metadata` guards that
+placement.
 
 The raw CLI output contains a `% Written by MuPDF` comment after the header
 (from `pdf_save_document`; `wopts.reproducible = 1` suppresses the version

@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import io
 import subprocess
-import sys
 import zlib
 from pathlib import Path
 from typing import Final
@@ -937,13 +936,3 @@ def generate_all(out_dir: Path, target: str = "OLDNAME") -> dict[str, Path | Non
         builder(p, target)
         surfaces[name] = p
     return surfaces
-
-
-if __name__ == "__main__":
-    out = generate_all(
-        Path(sys.argv[1]) if len(sys.argv) > 1 else Path.cwd() / "_generated"
-    )
-    sys.stdout.writelines(
-        f"{name} {p or 'SKIPPED (system TrueType font unavailable)'}\n"
-        for name, p in out.items()
-    )

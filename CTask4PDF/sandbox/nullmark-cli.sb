@@ -6,8 +6,8 @@
 ; that gains code execution in this process cannot reach the network or write
 ; outside the one output path of the run.
 ;
-; run-sandboxed.sh in this directory invokes it. BIN_PATH, IN_PATH and OUT_PATH
-; must be absolute: SBPL matches a `(param ...)` value as a literal string, so a
+; tests/test_redactor.py invokes it through sandbox-exec. BIN_PATH, IN_PATH and
+; OUT_PATH must be absolute: SBPL matches a `(param ...)` value as a literal string, so a
 ; relative path never matches the absolute path the kernel presents.
 (version 1)
 (deny default)

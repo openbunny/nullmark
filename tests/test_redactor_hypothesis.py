@@ -1,20 +1,15 @@
 from __future__ import annotations
 
-import os
 import re
-import shutil
 import string
 import subprocess
-import sys
 import tempfile
 from pathlib import Path
-from typing import Final
+from typing import TYPE_CHECKING, Final
 
-import pytest
 from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 
-sys.path.insert(0, str(Path(__file__).parent))
 import pdfutil as pdf
 from fixtures.generate import (
     BENIGN_BODY,
@@ -23,61 +18,13 @@ from fixtures.generate import (
     build_combo,
     generate_all,
 )
-from mupdf_discovery import discover_mupdf
 
-NULLMARK_DIR: Final = Path(__file__).resolve().parents[1]
-_DISCOVERED: Final = discover_mupdf()
-MUPDF_INCLUDE: Final = _DISCOVERED[0] if _DISCOVERED else Path("/opt/homebrew/include")
-MUPDF_LIB: Final = _DISCOVERED[1] if _DISCOVERED else Path("/opt/homebrew/lib")
+if TYPE_CHECKING:
+    import pytest
+
 _BENIGN_STREAM_TEXT: Final = BENIGN_BODY.decode("latin-1")
 _XMP_WRAPPER_TEXT: Final = XMP_TEMPLATE.format(title="")
 REPLACEMENT: Final = "NEWNAME"
-
-
-def _mupdf_available() -> bool:
-    return bool(_DISCOVERED and shutil.which("cc") and shutil.which("mutool"))
-
-
-if not _mupdf_available():
-    _reason = (
-        "mupdf not found (checked pkg-config, `brew --prefix mupdf`, /opt/homebrew and "
-        "/usr/local), or no `cc`/`mutool` on PATH."
-    )
-    if os.environ.get("NULLMARK_REQUIRE_MUPDF"):
-        pytest.fail(
-            f"{_reason} NULLMARK_REQUIRE_MUPDF is set, so this is an error, not a skip."
-        )
-    pytest.skip(
-        f"{_reason} Set NULLMARK_REQUIRE_MUPDF=1 to fail instead of skipping.",
-        allow_module_level=True,
-    )
-
-
-@pytest.fixture(scope="session")
-def cli_binary(tmp_path_factory: pytest.TempPathFactory) -> Path:
-    out = tmp_path_factory.mktemp("nullmark-cli-hyp") / "task4pdf_cli"
-    subprocess.run(
-        [
-            "cc",
-            "-DT4_MAIN",
-            "-std=c11",
-            "-I",
-            str(NULLMARK_DIR / "CTask4PDF" / "include"),
-            "-I",
-            str(MUPDF_INCLUDE),
-            "-L",
-            str(MUPDF_LIB),
-            f"-Wl,-rpath,{MUPDF_LIB}",
-            str(NULLMARK_DIR / "CTask4PDF" / "task4pdf.c"),
-            "-lmupdf",
-            "-o",
-            str(out),
-        ],
-        check=True,
-        capture_output=True,
-        text=True,
-    )
-    return out
 
 
 def _clean(path: Path, dest: Path) -> str:

@@ -7,5 +7,8 @@ __pycache__/
 .pytest_cache/
 tests/.venv/
 .hypothesis/
-CTask4PDF/fuzz/crash-*/
+CTask4PDF/fuzz/crash-*
+CTask4PDF/fuzz/leak-*
+CTask4PDF/fuzz/timeout-*
+CTask4PDF/fuzz/oom-*
 .claude/worktrees/

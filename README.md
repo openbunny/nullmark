@@ -95,22 +95,10 @@ MuPDF is licensed under the AGPL
 beyond personal use requires either releasing the app's source under the AGPL
 or holding a MuPDF commercial licence.
 
-### MuPDF version pin
+### MuPDF upgrades
 
-A workstation dependency is normally named by its install command, not a
-transcribed version, because a written number goes stale silently and Renovate
-does not track it. MuPDF is the exception: it parses attacker-supplied PDF
-input, so an upgrade whose security fixes and regressions were never reviewed
-changes the attack surface without a decision. `CTask4PDF/mupdf.lock` records
-the installed `mupdf` version and the sha256 of the resolved `libmupdf.dylib`
-the last reviewed build linked; `just mupdf-verify` (part of `just check`)
-fails if the linked library's version or hash differs, or if the lock is
-missing. After reviewing a MuPDF upgrade for its CVE delta, move the pin
-forward with:
-
-```sh
-just mupdf-lock
-```
+MuPDF parses attacker-supplied PDF input, so an upgrade changes the attack
+surface. Review its security fixes before installing it.
 
 ## Sandbox and hardened runtime
 
@@ -130,8 +118,7 @@ Seatbelt profile `CTask4PDF/sandbox/nullmark-cli.sb` instead.
 
 ## Verification
 
-`just test` runs the pytest suite and `CTask4PDF/verify-redaction.sh`. Both
-assert zero residual occurrences of the target, the replacement present in the
+`just test` runs the pytest suite. It asserts zero residual occurrences of the target, the replacement present in the
 output text, the scrub of the Info dictionary, XMP, outlines,
 annotations and form fields, a refusal to emit when the target survives in an
 embedded file or an appearance stream, and the byte identity of the four
@@ -164,7 +151,8 @@ display.
 ## Build
 
 ```sh
-just build
+just install
+just xctest
 ```
 
-`just check` runs every gate and reports every failure together.
+`just check` runs every gate and stops at the first failure.

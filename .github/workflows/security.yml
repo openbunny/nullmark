@@ -30,6 +30,5 @@ jobs:
       - name: vulnerabilities
         # tests/uv.lock pins the pytest, mypy, hypothesis and fontTools versions
         # the suite runs against. mise.lock pins the toolchain itself, which
-        # osv-scanner does not read, so the toolchain is covered by the
-        # actions-pin and tool-pins gates instead.
+        # osv-scanner does not read.
         run: osv-scanner scan source --lockfile tests/uv.lock

@@ -9,14 +9,13 @@ guarantee the core makes (`tests/`). The generated Xcode project comes from
 
 ## Gates
 
-`just check` runs every gate and reports every failure together rather than
-stopping at the first. `just --list` prints the recipes. `mise install`
-installs the pinned toolchain, `brew bundle` installs the Homebrew
-prerequisites, and `uv sync --frozen` in `tests/` installs the Python
-environment; `just ci-check` runs all three then the gates. The Xcode
-toolchain comes from the machine and must match `.xcode-version`;
-`just swift-toolchain` fails on a mismatch. [README.md](README.md) and
-[CONTRIBUTING.md](CONTRIBUTING.md) describe setup and contribution terms.
+`just check` runs every gate and stops at the first failure. `just --list`
+prints the recipes. `just install` installs the pinned toolchain from
+`mise.toml`, the Python environment from `tests/uv.lock` and the git hooks
+from `lefthook.yml`; `just ci-check` runs it, then the gates. Xcode, and
+MuPDF, LLVM and cppcheck under `/opt/homebrew`, come from the machine.
+[README.md](README.md) and [CONTRIBUTING.md](CONTRIBUTING.md) describe setup
+and contribution terms.
 
 - Never weaken a gate to make it green. Decide whether the code or the gate is
   wrong and say which. Lowering a floor, loosening an assertion, deleting a
@@ -55,11 +54,9 @@ treat as one.
 ## MuPDF
 
 MuPDF is a Homebrew-provided dylib that parses attacker-supplied PDF input.
-`CTask4PDF/mupdf.lock` records the reviewed version and the sha256 of the
-resolved `libmupdf.dylib`; `just mupdf-verify` fails closed on drift and
-prints a notice when no lock is recorded yet. `just mupdf-lock` moves the pin
-forward, and only after a reviewer has read the upgrade's CVE delta. MuPDF is
-AGPL; README.md states what distributing a linked build requires.
+The package manager installs and versions it; an upgrade is reviewed for its
+security fixes before it is installed. MuPDF is AGPL; README.md states what
+distributing a linked build requires.
 
 The app drops App Sandbox and the hardened runtime for one root cause:
 `libmupdf.dylib` is neither Apple-signed nor vendored, so library validation
@@ -72,11 +69,11 @@ disable them. Do not re-enable either without resolving that.
 - C11, warnings-as-errors in the CLI build. The core is fuzzed: a new decoder
   of PDF input ships a libFuzzer target under `CTask4PDF/fuzz/` and a seed in
   the committed corpus. Fix a crash in `task4pdf.c`, never in the harness.
-- Sanitizer runs scope suppressions to MuPDF with
-  `CTask4PDF/lsan-suppressions.txt`, because the library is not instrumented.
-  A new suppression names the leaking MuPDF symbol.
-- The fuzz harness is build-time scaffolding and is excluded from the
-  `clang-tidy` lint. `cppcheck` carries its own suppressions list.
+- `just fuzz` is also the sanitizer gate: ASan, UBSan and LeakSanitizer run
+  together over the seed corpus. A reproducer libFuzzer writes under
+  `CTask4PDF/fuzz/` joins the corpus once its fix lands.
+- `clang-tidy` reads its compile flags from `compile_flags.txt` and lints every
+  tracked C file. `cppcheck` carries its own suppressions list.
 - Allocation failure and parse failure are distinct: they produce distinct
   `T4Result.error` text, never one message for both causes.
 
@@ -110,16 +107,11 @@ until it passes.
 ## Theme
 
 No colour, font family, size or radius literal lives in this repository.
-Values come from `OpenBunnyTheme` and `OpenBunnyUI`; `just theme-check` fails
-on a literal in `App/`. A missing token is added in `openbunny/theme`, never as
-a literal here. The icon SVG carries only OpenBunny token colours.
-
-## Naming
-
-`just forbidden-names` fails on the origin project's branding. Word-boundary
-matching keeps the carried C identifiers (`CTask4PDF`, `task4pdf`,
-`t4_replace`, `T4Result`, `TASK4_`) green. Do not rename those to drop the
-word, and do not widen the pattern to match them.
+Values come from `OpenBunnyTheme` and `OpenBunnyUI`; the SwiftLint custom
+rule `theme_tokens` fails on a literal in `App/`. A missing token is added in
+`openbunny/theme`, never as a literal here. The app icon is
+`App/Assets/AppIcon.icon`; the in-app mark's SVG is a symlink to the icon's
+glyph.
 
 ## Documentation states the present
 

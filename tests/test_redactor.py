@@ -1,17 +1,14 @@
 from __future__ import annotations
 
-import os
 import re
-import shutil
 import subprocess
-import sys
 from pathlib import Path
 from typing import Final
 
 import pytest
 
-sys.path.insert(0, str(Path(__file__).parent))
 import pdfutil as pdf
+from conftest import ROOT
 from fixtures.generate import (
     build_astral_info_only,
     build_cidfont,
@@ -27,61 +24,9 @@ from fixtures.generate import (
     build_xmp_only,
     generate_all,
 )
-from mupdf_discovery import discover_mupdf
 
-NULLMARK_DIR: Final = Path(__file__).resolve().parents[1]
 TARGET: Final = "OLDNAME"
 REPLACEMENT: Final = "NEWNAME"
-
-_DISCOVERED: Final = discover_mupdf()
-MUPDF_INCLUDE: Final = _DISCOVERED[0] if _DISCOVERED else Path("/opt/homebrew/include")
-MUPDF_LIB: Final = _DISCOVERED[1] if _DISCOVERED else Path("/opt/homebrew/lib")
-
-
-def _mupdf_available() -> bool:
-    return bool(_DISCOVERED and shutil.which("cc") and shutil.which("mutool"))
-
-
-if not _mupdf_available():
-    _reason = (
-        "mupdf not found (checked pkg-config, `brew --prefix mupdf`, /opt/homebrew and "
-        "/usr/local), or no `cc`/`mutool` on PATH."
-    )
-    if os.environ.get("NULLMARK_REQUIRE_MUPDF"):
-        pytest.fail(
-            f"{_reason} NULLMARK_REQUIRE_MUPDF is set, so this is an error, not a skip."
-        )
-    pytest.skip(
-        f"{_reason} Set NULLMARK_REQUIRE_MUPDF=1 to fail instead of skipping.",
-        allow_module_level=True,
-    )
-
-
-@pytest.fixture(scope="session")
-def cli_binary(tmp_path_factory: pytest.TempPathFactory) -> Path:
-    out = tmp_path_factory.mktemp("nullmark-cli") / "task4pdf_cli"
-    subprocess.run(
-        [
-            "cc",
-            "-DT4_MAIN",
-            "-std=c11",
-            "-I",
-            str(NULLMARK_DIR / "CTask4PDF" / "include"),
-            "-I",
-            str(MUPDF_INCLUDE),
-            "-L",
-            str(MUPDF_LIB),
-            f"-Wl,-rpath,{MUPDF_LIB}",
-            str(NULLMARK_DIR / "CTask4PDF" / "task4pdf.c"),
-            "-lmupdf",
-            "-o",
-            str(out),
-        ],
-        check=True,
-        capture_output=True,
-        text=True,
-    )
-    return out
 
 
 @pytest.fixture(scope="session")
@@ -567,7 +512,7 @@ def test_xref_stream_id_with_nul_byte_scrubs_clean(
 
 
 def test_unterminated_trailer_id_fails_closed(cli_binary: Path, tmp_path: Path) -> None:
-    in_pdf = NULLMARK_DIR / "CTask4PDF" / "fuzz" / "corpus" / "unterminated-id.pdf"
+    in_pdf = ROOT / "CTask4PDF" / "fuzz" / "corpus" / "unterminated-id.pdf"
     out_pdf = tmp_path / "unterminated-id.out.pdf"
     result = _run_cli(cli_binary, in_pdf, out_pdf)
     assert _result_fields(result.stdout)["rc"] == 1, (
@@ -575,6 +520,38 @@ def test_unterminated_trailer_id_fails_closed(cli_binary: Path, tmp_path: Path) 
     )
     assert "trailer /ID" in result.stdout, f"wrong refusal; stdout={result.stdout!r}"
     assert not out_pdf.exists(), "fail-closed violated: output kept"
+
+
+def test_cli_redacts_under_its_sandbox_profile(
+    cli_binary: Path, fixture_pdfs: dict[str, Path | None], tmp_path: Path
+) -> None:
+    in_pdf = fixture_pdfs["simple"]
+    assert in_pdf is not None
+    paths = [
+        cli_binary.resolve(),
+        in_pdf.resolve(),
+        tmp_path.resolve() / "sandboxed.pdf",
+    ]
+    defines = zip(("BIN_PATH", "IN_PATH", "OUT_PATH"), paths, strict=True)
+    result = subprocess.run(
+        [
+            "sandbox-exec",
+            "-f",
+            str(ROOT / "CTask4PDF" / "sandbox" / "nullmark-cli.sb"),
+            *(arg for key, path in defines for arg in ("-D", f"{key}={path}")),
+            *map(str, paths),
+            TARGET,
+            REPLACEMENT,
+        ],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    fields = _result_fields(result.stdout)
+    assert (fields["rc"], fields["residual"]) == (0, 0), (
+        f"sandboxed run failed; stdout={result.stdout!r} stderr={result.stderr!r}"
+    )
+    assert paths[2].exists(), "sandboxed run wrote no output"
 
 
 def test_trailer_junk_scrubs_clean(cli_binary: Path, tmp_path: Path) -> None:

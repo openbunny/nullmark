@@ -24,3 +24,9 @@ indentation_width:
 # the linter requires the same form.
 trailing_comma:
   mandatory_comma: true
+custom_rules:
+  theme_tokens:
+    name: 'Theme tokens'
+    regex: 'DS\.|#[0-9a-fA-F]{3,}|Color\(\.|Font\.(system|custom)|\.font\(\.(system|custom)\('
+    message: 'Use an OpenBunny theme token instead of a colour or font literal.'
+    severity: 'error'
