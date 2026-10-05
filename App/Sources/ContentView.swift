@@ -284,10 +284,11 @@ private struct Header: View {
 
 struct NullmarkMark: View {
   var body: some View {
-    Image("NullmarkMark")
+    Image(.nullmarkMark)
       .resizable()
       .scaledToFit()
       .foregroundStyle(Color.foreground)
+      .accessibilityHidden(true)
   }
 }
 

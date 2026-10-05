@@ -3,6 +3,10 @@ import OpenBunnyUI
 import SwiftUI
 
 private struct ComponentGallery: View {
+  private static let bannerHeight: CGFloat = 260
+  private static let canvasWidth: CGFloat = 640
+  private static let canvasHeight: CGFloat = 820
+
   private let fontFailure: FontError? = {
     do throws(FontError) {
       try Fonts.register()
@@ -11,6 +15,8 @@ private struct ComponentGallery: View {
       return error
     }
   }()
+
+  @State private var taps = 0
 
   var body: some View {
     ScrollView {
@@ -24,18 +30,18 @@ private struct ComponentGallery: View {
         CopyButton(text: "copied text", label: "Copy sample text")
         SectionHeading(number: "03", title: "Outline buttons")
         HStack(spacing: Spacing.base) {
-          Button("Enabled") {}.buttonStyle(.outline)
-          Button("Disabled") {}.buttonStyle(.outline).disabled(true)
+          Button("Enabled") { taps += 1 }.buttonStyle(.outline)
+          Button("Disabled") { taps += 1 }.buttonStyle(.outline).disabled(true)
         }
         SectionHeading(number: "04", title: "Status banner")
         StatusBanner(title: "Drop a PDF to begin", message: "Status banner with one action.") {
-          Button("Choose PDF…") {}.buttonStyle(.outline)
+          Button("Choose PDF…") { taps += 1 }.buttonStyle(.outline)
         }
-        .frame(height: 260)
+        .frame(height: Self.bannerHeight)
       }
       .padding(Spacing.loose)
     }
-    .frame(width: 640, height: 820)
+    .frame(width: Self.canvasWidth, height: Self.canvasHeight)
     .background(Color.paper)
     .openbunnyTheme()
   }

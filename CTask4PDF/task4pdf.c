@@ -38,6 +38,7 @@ enum {
     // Caps recursion over directly nested dict/array structure, so a crafted
     // object cannot exhaust the call stack; exceeding it fails closed.
     MAX_CONTAINER_DEPTH = 64,
+    ID_DIGEST_COUNT = 2,
     HEX_ALPHA_OFFSET = 10,
     NIBBLE_BITS = 4,
     HEX_NIBBLE_MASK = 0xF,
@@ -75,7 +76,7 @@ static void sanitize_trailer(fz_context *ctx, pdf_document *doc) {
     // format defines. Repairing an unterminated /ID array absorbs the bytes
     // that follow it, page text included, and the scrub never reaches them.
     pdf_obj *id = pdf_dict_get(ctx, trailer, PDF_NAME(ID));
-    if (id != NULL && !(pdf_is_array(ctx, id) && pdf_array_len(ctx, id) == 2 &&
+    if (id != NULL && !(pdf_is_array(ctx, id) && pdf_array_len(ctx, id) == ID_DIGEST_COUNT &&
                         pdf_is_string(ctx, pdf_array_get(ctx, id, 0)) &&
                         pdf_is_string(ctx, pdf_array_get(ctx, id, 1)))) {
         fz_throw(ctx, FZ_ERROR_GENERIC, "trailer /ID is not an array of two strings");
