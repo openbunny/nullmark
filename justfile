@@ -20,7 +20,6 @@ set shell := ["bash", "-uc"]
 # tools locally and in CI, where no step can adjust PATH for the just call.
 export PATH := "/opt/homebrew/opt/llvm/bin:" + env('PATH')
 
-c_glob := "CTask4PDF/*.c CTask4PDF/**/*.c CTask4PDF/*.h CTask4PDF/**/*.h App/*.h App/**/*.h"
 llvm_bin := "/opt/homebrew/opt/llvm/bin"
 mupdf_lib := "/opt/homebrew/lib/libmupdf.dylib"
 mupdf_lock := "CTask4PDF/mupdf.lock"
@@ -61,49 +60,46 @@ _all gates:
 fmt:
     #!/usr/bin/env bash
     set -euo pipefail
-    c_files=$(git ls-files {{ c_glob }})
-    test -n "$c_files"
-    clang-format -i $c_files
+    mapfile -t c_files < <(git ls-files '*.c' '*.h')
+    (( ${#c_files[@]} > 0 ))
+    clang-format -i "${c_files[@]}"
     swift format format --in-place --recursive App AppTests
     ruff format tests
 
 fmt-check:
     #!/usr/bin/env bash
     set -euo pipefail
-    c_files=$(git ls-files {{ c_glob }})
-    test -n "$c_files"
-    clang-format --dry-run --Werror $c_files
+    mapfile -t c_files < <(git ls-files '*.c' '*.h')
+    (( ${#c_files[@]} > 0 ))
+    clang-format --dry-run --Werror "${c_files[@]}"
     swift format lint --strict --recursive App AppTests
     ruff format --check tests
 
 lint:
     #!/usr/bin/env bash
     set -euo pipefail
-    # clang-tidy lints the shipped C core. The fuzz harness under CTask4PDF/fuzz
-    # is build-time-only test scaffolding (project.yml compiles only task4pdf.c)
-    # and is exercised by the sanitized `fuzz` gate, so it is not linted here.
-    c_files=$(git ls-files 'CTask4PDF/*.c' 'CTask4PDF/**/*.c' ':(exclude)CTask4PDF/fuzz/*')
-    test -n "$c_files"
-    # -isysroot: MuPDF's headers include <setjmp.h> from the macOS SDK; without
-    # the sysroot clang-tidy cannot find it and the lint fails as an environment
-    # error instead of exercising the checks.
-    clang-tidy --config-file=.clang-tidy $c_files -- -std=c11 \
+    mapfile -t c_files < <(git ls-files '*.c')
+    (( ${#c_files[@]} > 0 ))
+    # MuPDF's headers include <setjmp.h> from the macOS SDK; without -isysroot
+    # clang-tidy stops on the missing header before any check runs.
+    clang-tidy --config-file=.clang-tidy "${c_files[@]}" -- -std=c11 \
         -isysroot "$(xcrun --show-sdk-path)" \
         -I CTask4PDF/include -I /opt/homebrew/include
     swiftlint lint --strict --config .swiftlint.yml
     ruff check tests
-    sh_files=$(git ls-files 'CTask4PDF/*.sh' 'CTask4PDF/**/*.sh')
-    test -n "$sh_files"
-    shellcheck $sh_files
+    mapfile -t sh_files < <(git ls-files '*.sh')
+    (( ${#sh_files[@]} > 0 ))
+    shellcheck "${sh_files[@]}"
 
 cppcheck:
     #!/usr/bin/env bash
     set -euo pipefail
-    test -f CTask4PDF/task4pdf.c
+    mapfile -t c_files < <(git ls-files '*.c')
+    (( ${#c_files[@]} > 0 ))
     cppcheck --enable=warning,performance,portability,style --std=c11 --language=c \
         --inline-suppr --suppressions-list=CTask4PDF/cppcheck-suppressions.txt \
         --error-exitcode=2 \
-        -I CTask4PDF/include -I /opt/homebrew/include CTask4PDF/task4pdf.c
+        -I CTask4PDF/include -I /opt/homebrew/include "${c_files[@]}"
 
 # Records the linked MuPDF's installed version and the sha256 of the resolved
 # libmupdf.dylib into CTask4PDF/mupdf.lock. See README.md for why this pin

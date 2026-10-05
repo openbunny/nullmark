@@ -1,9 +1,5 @@
-# cppcheck suppressions for nullmark CTask4PDF/task4pdf.c.
-#
-# knownConditionTrueFalse fires inside Homebrew MuPDF's own inline geometry
-# helpers (fz_irect_width / fz_irect_height in mupdf/fitz/geometry.h), reached
-# only because task4pdf.c includes that header. That code is third-party, is not
-# nullmark's to change, and ships from a non-instrumented build; a finding there is
-# out of nullmark scope. Scoped to the mupdf header path so no finding in nullmark's
-# own sources is ever covered.
+# knownConditionTrueFalse fires inside MuPDF's inline fz_irect_width and
+# fz_irect_height (mupdf/fitz/geometry.h), which task4pdf.c reaches by including
+# that header. The pattern matches that header's path only, so no finding in
+# this repository's sources is covered.
 knownConditionTrueFalse:*/mupdf/fitz/geometry.h
