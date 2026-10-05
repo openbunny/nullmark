@@ -3,8 +3,12 @@ from __future__ import annotations
 import shutil
 import subprocess
 from pathlib import Path
+from typing import Final
 
-_FALLBACK_PREFIXES: tuple[Path, ...] = (Path("/opt/homebrew"), Path("/usr/local"))
+_FALLBACK_PREFIXES: Final[tuple[Path, ...]] = (
+    Path("/opt/homebrew"),
+    Path("/usr/local"),
+)
 
 
 def _has_headers(prefix: Path) -> bool:

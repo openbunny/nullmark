@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 import re
 import shutil
 import string
@@ -22,27 +23,32 @@ from fixtures.generate import (
     build_combo,
     generate_all,
 )
+from mupdf_discovery import discover_mupdf
 
 NULLMARK_DIR: Final = Path(__file__).resolve().parents[1]
-MUPDF_INCLUDE: Final = Path("/opt/homebrew/include")
-MUPDF_LIB: Final = Path("/opt/homebrew/lib")
+_DISCOVERED: Final = discover_mupdf()
+MUPDF_INCLUDE: Final = _DISCOVERED[0] if _DISCOVERED else Path("/opt/homebrew/include")
+MUPDF_LIB: Final = _DISCOVERED[1] if _DISCOVERED else Path("/opt/homebrew/lib")
 _BENIGN_STREAM_TEXT: Final = BENIGN_BODY.decode("latin-1")
 _XMP_WRAPPER_TEXT: Final = XMP_TEMPLATE.format(title="")
 REPLACEMENT: Final = "NEWNAME"
 
 
 def _mupdf_available() -> bool:
-    return bool(
-        (MUPDF_INCLUDE / "mupdf" / "fitz.h").exists()
-        and list(MUPDF_LIB.glob("libmupdf.*"))
-        and shutil.which("cc")
-        and shutil.which("mutool")
-    )
+    return bool(_DISCOVERED and shutil.which("cc") and shutil.which("mutool"))
 
 
 if not _mupdf_available():
+    _reason = (
+        "mupdf not found (checked pkg-config, `brew --prefix mupdf`, /opt/homebrew and "
+        "/usr/local), or no `cc`/`mutool` on PATH."
+    )
+    if os.environ.get("NULLMARK_REQUIRE_MUPDF"):
+        pytest.fail(
+            f"{_reason} NULLMARK_REQUIRE_MUPDF is set, so this is an error, not a skip."
+        )
     pytest.skip(
-        "mupdf not found under /opt/homebrew (brew install mupdf), or no `cc`/`mutool` on PATH",
+        f"{_reason} Set NULLMARK_REQUIRE_MUPDF=1 to fail instead of skipping.",
         allow_module_level=True,
     )
 

@@ -5,13 +5,14 @@ import os
 import subprocess
 import zlib
 from pathlib import Path
+from typing import Final
 
-C_MAX_DECOMPRESSED_STREAM_BYTES = 64 * 1024 * 1024
-C_MAX_CONTAINER_DEPTH = 64
+C_MAX_DECOMPRESSED_STREAM_BYTES: Final = 64 * 1024 * 1024
+C_MAX_CONTAINER_DEPTH: Final = 64
 
-SYSTEM_TTF = Path("/System/Library/Fonts/Supplemental/Arial.ttf")
+SYSTEM_TTF: Final = Path("/System/Library/Fonts/Supplemental/Arial.ttf")
 
-XMP_TEMPLATE = (
+XMP_TEMPLATE: Final = (
     '<?xpacket begin="﻿" id="W5M0MpCehiHzreSzNTczkc9d"?>\n'
     '<x:xmpmeta xmlns:x="adobe:ns:meta/">\n'
     '<rdf:RDF xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">\n'
@@ -140,7 +141,7 @@ def _page_dict(
     ).encode()
 
 
-BENIGN_BODY = b"BT /F1 18 Tf 72 700 Td (Body text with no target.) Tj ET"
+BENIGN_BODY: Final = b"BT /F1 18 Tf 72 700 Td (Body text with no target.) Tj ET"
 
 
 def _helvetica() -> bytes:
@@ -366,7 +367,7 @@ def build_oversized_xmp(path: Path) -> None:
     _finish(b, path, catalog, pages, page, info, f" /Metadata {metadata} 0 R")
 
 
-COMBO_SURFACES = frozenset({"info", "xmp", "outline", "annotation", "field"})
+COMBO_SURFACES: Final = frozenset({"info", "xmp", "outline", "annotation", "field"})
 
 
 def build_combo(
