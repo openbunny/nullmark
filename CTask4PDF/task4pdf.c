@@ -1417,13 +1417,14 @@ int t4_replace(const char *in_path, const char *out_path, const char *find, cons
 
 #ifdef T4_MAIN
 int main(int argc, char **argv) {
-    enum { EXPECTED_ARGC = 5 };
+    enum { ARG_IN = 1, ARG_OUT, ARG_FIND, ARG_REPLACE, EXPECTED_ARGC };
+    enum { EXIT_USAGE = 2 };
     if (argc != EXPECTED_ARGC) {
-        fprintf(stderr, "usage: %s in.pdf out.pdf find replace\n", argv[0]);
-        return 2;
+        (void)fprintf(stderr, "usage: %s in.pdf out.pdf find replace\n", argv[0]);
+        return EXIT_USAGE;
     }
     T4Result r;
-    int rc = t4_replace(argv[1], argv[2], argv[3], argv[4], &r);
+    int rc = t4_replace(argv[ARG_IN], argv[ARG_OUT], argv[ARG_FIND], argv[ARG_REPLACE], &r);
     printf("rc=%d matches=%" PRId64 " pages=%d residual=%" PRId64 " error=%s\n", rc, r.matches,
            r.pages_changed, r.residual, r.error);
     return rc || r.residual ? 1 : 0;

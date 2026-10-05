@@ -74,7 +74,7 @@ lint:
     (( ${#c_files[@]} > 0 ))
     # MuPDF's headers include <setjmp.h> from the macOS SDK; without -isysroot
     # clang-tidy stops on the missing header before any check runs.
-    clang-tidy --config-file=.clang-tidy "${c_files[@]}" -- -std=c11 \
+    clang-tidy --config-file=.clang-tidy "${c_files[@]}" -- -DT4_MAIN -std=c11 \
         -isysroot "$(xcrun --show-sdk-path)" \
         -I CTask4PDF/include -I /opt/homebrew/include
     swiftlint lint --strict --config .swiftlint.yml
