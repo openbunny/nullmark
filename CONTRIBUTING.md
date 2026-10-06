@@ -8,6 +8,7 @@ How to build, test, and submit a change to `nullmark`.
 
 - [Development](#development)
 - [Commits and pull requests](#commits-and-pull-requests)
+- [Releases](#releases)
 - [Developer Certificate of Origin](#developer-certificate-of-origin)
 - [Security-sensitive changes](#security-sensitive-changes)
 - [Reporting bugs](#reporting-bugs)
@@ -41,6 +42,17 @@ How to build, test, and submit a change to `nullmark`.
 - Do not weaken a gate to make it pass: no lowered floor, loosened assertion,
   deleted case or widened suppression. Fix the cause, or say why the gate is
   wrong.
+
+## Releases
+
+A release is source only: a `vX.Y.Z` tag on `main` and a GitHub release whose
+notes list the changes since the previous tag. No build of the app is attached.
+
+1. Set `MARKETING_VERSION` in `project.yml` to `X.Y.Z` and raise
+   `CURRENT_PROJECT_VERSION` by one, in a `chore: release X.Y.Z` commit.
+2. Run `just check`.
+3. Create the release with `gh release create vX.Y.Z --target main
+   --generate-notes`.
 
 ## Developer Certificate of Origin
 
