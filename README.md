@@ -50,11 +50,12 @@ The app does not perform OCR.
 
 ## Install
 
-No signed or notarized build is published; the app is built from source. A
-build links `libmupdf.dylib` from Homebrew at `/opt/homebrew/opt/mupdf/lib`, so
-it runs only on a Mac with Homebrew MuPDF installed, and it is ad-hoc signed
-(`Signing.xcconfig`). Without Homebrew MuPDF the app does not launch: dyld
-reports `Library not loaded: /opt/homebrew/opt/mupdf/lib/libmupdf.dylib`.
+The project is published as source only: no build of the app is distributed,
+signed or notarized; it is built from a clone. A build links `libmupdf.dylib`
+from Homebrew at `/opt/homebrew/opt/mupdf/lib`, so it runs only on a Mac with
+Homebrew MuPDF installed, and it is ad-hoc signed (`Signing.xcconfig`). Without
+Homebrew MuPDF the app does not launch: dyld reports `Library not loaded:
+/opt/homebrew/opt/mupdf/lib/libmupdf.dylib`.
 
 Requirements:
 

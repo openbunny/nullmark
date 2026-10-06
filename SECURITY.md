@@ -4,10 +4,9 @@
 
 ## Reporting a vulnerability
 
-Report suspected vulnerabilities privately, not through a public issue. Where
-GitHub private vulnerability reporting is enabled, use the repository's
-**Security** tab and choose **Report a vulnerability**; otherwise contact an
-organization administrator directly.
+Report suspected vulnerabilities privately, not through a public issue: open
+the repository's **Security** tab and choose **Report a vulnerability**. The
+report is visible only to the maintainers.
 
 Include the affected component (app, redaction core or CLI), the impact, the
 macOS version and steps to reproduce. Describe the input PDF; do not attach it,
