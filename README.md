@@ -50,6 +50,16 @@ The app does not perform OCR.
 
 ## Install
 
+Install with Homebrew from the [`oa/tap`](https://github.com/oa/homebrew-tap)
+tap:
+
+```sh
+brew install --cask oa/tap/nullmark
+```
+
+The cask installs the release zip below. Gatekeeper blocks its first launch as
+described below.
+
 Each [release](https://github.com/openbunny/nullmark/releases) attaches
 `Nullmark-X.Y.Z.zip`, an ad-hoc signed app, and `SHA256SUMS`, with a build
 provenance attestation for both files. The app is not notarized: no Developer ID
