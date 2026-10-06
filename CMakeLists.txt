@@ -66,7 +66,8 @@ find_program(UV uv REQUIRED)
 add_test(NAME pytest COMMAND ${UV} run --frozen pytest
   WORKING_DIRECTORY "${CMAKE_SOURCE_DIR}/tests")
 set_tests_properties(pytest PROPERTIES
-  ENVIRONMENT "NULLMARK_CLI=$<TARGET_FILE:nullmark-cli>")
+  ENVIRONMENT "NULLMARK_CLI=$<TARGET_FILE:nullmark-cli>"
+  ENVIRONMENT_MODIFICATION "PATH=path_list_prepend:${MUPDF_PREFIX}/bin")
 
 # -rss_limit_mb=0 stops libFuzzer starting its RSS monitor thread, which
 # LeakSanitizer reports as a leak at exit; -malloc_limit_mb keeps the

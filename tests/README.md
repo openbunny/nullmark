@@ -19,13 +19,15 @@ Tests for `t4_replace` in `../CTask4PDF/task4pdf.c`, run against the standalone
 
 ## Prerequisites
 
-MuPDF must be installed as a workstation tool, with its headers, library and
-`mutool` available.
+`../mupdf/CMakeLists.txt` builds the pinned MuPDF release into `build/mupdf`:
+the static libraries the CLI links and the `mutool` binary the suite checks
+surfaces with.
 
-The CMake build in `../CMakeLists.txt` compiles the CLI against MuPDF with the
-hardened flags and `-Werror`, and the CTest entry `pytest` passes its path to
-the suite as `NULLMARK_CLI`. Run outside `just test` with that variable unset,
-the suite fails rather than skips. `mutool` must be on `PATH`.
+The CMake build in `../CMakeLists.txt` compiles the CLI against that MuPDF with
+the hardened flags and `-Werror`. The CTest entry `pytest` passes the CLI's path
+to the suite as `NULLMARK_CLI` and puts `build/mupdf/bin` first on `PATH`, so
+the suite runs the pinned `mutool`. Run outside `just test` with `NULLMARK_CLI`
+unset, the suite fails rather than skips; `mutool` must then be on `PATH`.
 
 Python dependencies (pytest, hypothesis, fontTools, pikepdf, mypy) are pinned in
 `pyproject.toml` and `uv.lock`. `just install` syncs them into `tests/.venv`,

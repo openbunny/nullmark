@@ -22,11 +22,14 @@ ExternalProject_Add(mupdf-source
   CONFIGURE_COMMAND ""
   BUILD_COMMAND ${CMAKE_COMMAND} -E env
     MACOSX_DEPLOYMENT_TARGET=${CMAKE_OSX_DEPLOYMENT_TARGET}
-    ${MAKE} -j${NPROC} ${MUPDF_MAKE_ARGS} libs
+    ${MAKE} -j${NPROC} ${MUPDF_MAKE_ARGS} libs tools
   INSTALL_COMMAND ${MAKE} ${MUPDF_MAKE_ARGS} prefix=<INSTALL_DIR> install-libs
+    COMMAND ${CMAKE_COMMAND} -E make_directory <INSTALL_DIR>/bin
+    COMMAND ${CMAKE_COMMAND} -E copy <SOURCE_DIR>/build/release/mutool <INSTALL_DIR>/bin/
   BUILD_BYPRODUCTS
     "${MUPDF_PREFIX}/lib/libmupdf.a"
-    "${MUPDF_PREFIX}/lib/libmupdf-third.a")
+    "${MUPDF_PREFIX}/lib/libmupdf-third.a"
+    "${MUPDF_PREFIX}/bin/mutool")
 set(MUPDF_LICENSE_FILES
   mupdf:COPYING
   brotli:thirdparty/brotli/LICENSE
