@@ -86,8 +86,8 @@ and builds `libmupdf.a` and `libmupdf-third.a` with MuPDF's own Makefile.
 suite and the fuzz target run the same MuPDF. LLVM (clang-format, clang-tidy,
 LeakSanitizer, libFuzzer, llvm-cov) and cppcheck are workstation prerequisites
 outside `mise.toml`; the `justfile` header lists them. The AGPL terms for distributing a linked build are in
-[README.md](../README.md#license). The reason the app runs without App Sandbox
-and the hardened runtime is in
+[README.md](../README.md#license). The sandbox and hardened-runtime entitlements
+are described in
 [README.md](../README.md#sandbox-and-hardened-runtime).
 
 MuPDF parses attacker-supplied PDF input, so an upgrade changes the attack

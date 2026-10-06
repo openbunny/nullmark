@@ -141,15 +141,17 @@ the export does not carry a record of the machine that produced it.
 
 ## Sandbox and hardened runtime
 
-The app does not adopt App Sandbox (no `com.apple.security.app-sandbox` in
-`App.entitlements`) and disables the hardened runtime (`ENABLE_HARDENED_RUNTIME`
-is `NO` in `project.yml`). Nothing in the build requires either deviation: both
-were taken for a Homebrew `libmupdf.dylib` outside the bundle, and MuPDF is
-linked statically. Re-enabling them needs the sandbox's user-selected file
-entitlements and is its own change.
+The app runs under App Sandbox with the hardened runtime. `App.entitlements`
+holds `com.apple.security.app-sandbox` and
+`com.apple.security.files.user-selected.read-write`, which grants access to the
+files the open panel, the save panel and a drop return. The app holds no other
+entitlement and no temporary exception. The engine's scratch directory is under
+the container's temporary directory. MuPDF is linked statically, so no library
+outside the system fails library validation at load time.
+`ENABLE_HARDENED_RUNTIME` is `YES` in `project.yml`.
 
-This deviation is scoped to this app. The standalone CLI runs under the Seatbelt
-profile `CTask4PDF/sandbox/nullmark-cli.sb` instead.
+The standalone CLI runs under the Seatbelt profile
+`CTask4PDF/sandbox/nullmark-cli.sb` instead.
 
 ## Network behaviour
 

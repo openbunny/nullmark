@@ -68,9 +68,11 @@ The Makefile flags in `MUPDF_MAKE_ARGS` keep OpenSSL, X11 and GLUT off the link
 line. Do not remove one without confirming `otool -L` on the app still lists no
 library outside `/usr/lib` and `/System`.
 
-The app runs without App Sandbox and the hardened runtime. Both were turned off
-for a Homebrew `libmupdf.dylib` that the static link removed; `project.yml`
-records this at the settings. Re-enabling them is its own change.
+The app runs under App Sandbox and the hardened runtime. `App/App.entitlements`
+grants only `com.apple.security.files.user-selected.read-write` beyond the
+sandbox itself. Do not add an entitlement or a temporary exception without
+naming the code path that fails without it. A dynamic library outside the
+system and the bundle fails library validation under the hardened runtime.
 
 ## C core
 

@@ -27,11 +27,7 @@ settings:
       - '-Wall'
       - '-Wextra'
       - '-Wpedantic'
-    # Hazard: App Sandbox and the hardened runtime are off, and nothing in this
-    # build requires it. Both were turned off for a Homebrew libmupdf.dylib,
-    # which the static MuPDF link removed. Re-enabling them needs the sandbox's
-    # user-selected file entitlements and is its own change.
-    ENABLE_HARDENED_RUNTIME: 'NO'
+    ENABLE_HARDENED_RUNTIME: 'YES'
     HEADER_SEARCH_PATHS:
       - '$(PROJECT_DIR)/CTask4PDF/include'
       - '$(PROJECT_DIR)/build/dev/mupdf/include'

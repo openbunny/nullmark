@@ -9,7 +9,7 @@ adds it.
 
 | Document                                                                | Owns                                                                                                           |
 | ----------------------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------- |
-| [README.md](../README.md)                                               | project summary, install, use, the guarantee, byte-identity claims, sandbox and hardened-runtime rationale, licence |
+| [README.md](../README.md)                                               | project summary, install, use, the guarantee, byte-identity claims, sandbox and hardened-runtime entitlements, licence |
 | [docs/design.md](design.md)                                             | layout, replacement and scrubbed surfaces, verification scan, MuPDF dependency, known limitations              |
 | [tests/README.md](../tests/README.md)                                   | test prerequisites, fixtures and the cases built on them                                                       |
 | [SECURITY.md](../SECURITY.md)                                           | vulnerability reporting, scope, network behaviour                                                              |
