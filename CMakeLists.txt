@@ -65,6 +65,7 @@ set_tests_properties(pytest PROPERTIES
 file(MAKE_DIRECTORY "${CMAKE_BINARY_DIR}/fuzz-corpus")
 add_test(NAME fuzz COMMAND fuzz-t4-replace
   "${CMAKE_BINARY_DIR}/fuzz-corpus" ${CORPUS}
+  "-dict=${CMAKE_SOURCE_DIR}/CTask4PDF/fuzz/pdf.dict"
   -max_total_time=60 -rss_limit_mb=0 -malloc_limit_mb=4096
   "-artifact_prefix=${CMAKE_SOURCE_DIR}/CTask4PDF/fuzz/")
 set_tests_properties(fuzz PROPERTIES ENVIRONMENT "ASAN_OPTIONS=detect_leaks=1")
