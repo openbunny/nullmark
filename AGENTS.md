@@ -33,9 +33,9 @@ and contribution terms.
 `t4_replace` returns 0 only when the output reopens, re-parses, and an
 independent scan finds zero occurrences of the target on every surface: page
 text, decoded string values, and the decompressed bytes of every content,
-object-graph and embedded-file stream, in the target's UTF-8 and UTF-16BE
-encodings. A return of 0 with `out->residual > 0` is a failure the caller must
-treat as one.
+object-graph and embedded-file stream, in the target's UTF-8, UTF-16BE and
+UTF-16LE encodings. A return of 0 with `out->residual > 0` is a failure the
+caller must treat as one.
 
 - `out_path` holds a file only on that outcome. Every other outcome removes it
   before returning, so no partial or target-bearing file is left on disk. Do

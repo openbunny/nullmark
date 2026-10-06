@@ -3,12 +3,12 @@
 A local macOS app that removes a target string from a PDF and verifies its
 absence across every surface. It exists to remove a deadname from a person's
 own documents after a legal name change: the old text is removed from the page
-and from the document metadata, the new text is drawn or substituted in its
-place, and the output carries no record that a rewrite tool touched the file —
-no second `%%EOF`, no `/Prev`, no engine version string. Only occurrences of
-the target change; every other field keeps the content it had. That is a
-field-level guarantee, not whole-file byte identity — see "What preservation
-means at the byte level" below.
+and from the document metadata, and the new text is drawn or substituted in its
+place. The output has no second `%%EOF`, no `/Prev` and no MuPDF version
+string; it keeps the versionless `% Written by MuPDF` comment that the save
+writes. Only occurrences of the target change; every other field keeps the
+content it had. That is a field-level guarantee, not whole-file byte identity —
+see "What preservation means at the byte level" below.
 
 Everything runs on the local machine. The app makes no network request.
 
@@ -87,7 +87,7 @@ the export does not carry a record of the machine that produced it.
 
 MuPDF, LLVM (clang-format, clang-tidy, LeakSanitizer, libFuzzer, llvm-cov) and
 cppcheck are workstation prerequisites outside `mise.toml`; the justfile header
-names which gate needs each.
+lists them.
 
 `project.yml` links `-lmupdf` and searches `/opt/homebrew/{include,lib}`.
 MuPDF is licensed under the AGPL
@@ -118,11 +118,12 @@ Seatbelt profile `CTask4PDF/sandbox/nullmark-cli.sb` instead.
 
 ## Verification
 
-`just test` runs the pytest suite. It asserts zero residual occurrences of the target, the replacement present in the
-output text, the scrub of the Info dictionary, XMP, outlines,
-annotations and form fields, a refusal to emit when the target survives in an
-embedded file or an appearance stream, and the byte identity of the four
-fields above. `tests/README.md` lists every case.
+`just test` runs the pytest suite. It asserts zero residual occurrences of the
+target, the replacement present in the output text, the scrub of the Info
+dictionary, XMP, outlines, annotations and form fields, a refusal to emit when
+the target survives in an embedded file or an appearance stream, and the byte
+identity of the four fields above. `tests/README.md` describes the fixtures and
+the cases built on them.
 
 The Swift app calls the C core through `PDFEngine.replace`, which
 `EditorModel.apply()` calls. `PDFMetadata` is not on that path: it is a
@@ -143,10 +144,12 @@ display.
   from the field value) is not rewritten. The scan detects the target there
   and fails closed for the same reason as an embedded file.
 - Text that is an image (a scan) has no text layer to remove and is out of
-  scope until OCR or region redaction is added.
-- `FileMetadata.apply(to:)` removes the `com.apple.provenance` extended
-  attribute with `removexattr` and does not check the result; APFS may keep
-  projecting the attribute onto the exported file regardless.
+  scope. OCR is not performed.
+- `FileMetadata.apply(to:)` removes the `com.apple.quarantine` and
+  `com.apple.provenance` extended attributes with `removexattr` and returns a
+  description of each removal the OS refuses, except for an absent attribute.
+  APFS may keep projecting `com.apple.provenance` onto the exported file
+  regardless of a successful call.
 
 ## Build
 
