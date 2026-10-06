@@ -467,10 +467,29 @@ static int scrub_container(fz_context *ctx, pdf_obj *obj, const char *find, cons
 // Loading each numbered object reaches strings and names packed into object
 // streams as well as top-level ones.
 //
-// Hazard: an object whose whole body is a reference to another object leaks
-// one allocation per object inside pdf_save_document (MuPDF renumberobjs
-// keeps the reference it passes to pdf_update_object), and the scrub skips
-// indirect values. Such an input is refused here, before anything is saved.
+// Hazard: pdf_save_document leaks one allocation for each object whose whole
+// body is a reference to another object (MuPDF renumberobjs keeps the
+// reference it passes to pdf_update_object). Such an object's body is replaced
+// with a deep copy of the value the reference resolves to, which readers see
+// as the same value and the scrub then reaches. A stream has no copyable value,
+// and a cycle or a missing target resolves to none; both are refused.
+static pdf_obj *copy_referenced_value(fz_context *ctx, pdf_obj *ref, int num) {
+    if (pdf_is_stream(ctx, ref)) {
+        fz_throw(ctx, FZ_ERROR_GENERIC,
+                 "object %d holds only a reference to a stream, which the rewrite "
+                 "cannot copy; the document is refused",
+                 num);
+    }
+    pdf_obj *target = pdf_resolve_indirect_chain(ctx, ref);
+    if (target == NULL || pdf_is_indirect(ctx, target)) {
+        fz_throw(ctx, FZ_ERROR_GENERIC,
+                 "object %d holds only a reference that does not resolve to a value; "
+                 "the document is refused",
+                 num);
+    }
+    return pdf_deep_copy_obj(ctx, target);
+}
+
 static int scrub_metadata_strings(fz_context *ctx, pdf_document *doc, const char *find,
                                   const char *repl) {
     int total = 0;
@@ -481,10 +500,10 @@ static int scrub_metadata_strings(fz_context *ctx, pdf_document *doc, const char
         fz_try(ctx) {
             obj = pdf_load_object(ctx, doc, i);
             if (pdf_is_indirect(ctx, obj)) {
-                fz_throw(ctx, FZ_ERROR_GENERIC,
-                         "object %d holds only a reference to another object; the rewrite "
-                         "requires every object to hold a value, so the document is refused",
-                         i);
+                pdf_obj *copy = copy_referenced_value(ctx, obj, i);
+                pdf_drop_obj(ctx, obj);
+                obj = copy;
+                pdf_update_object(ctx, doc, i, obj);
             }
             pdf_obj *nw = scrub_value(ctx, obj, find, repl);
             if (nw != NULL) {

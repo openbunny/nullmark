@@ -683,14 +683,26 @@ def build_trailer_junk_only(path: Path, target: str) -> None:
     )
 
 
-def build_bare_reference_only(path: Path) -> None:
+def build_bare_reference_only(path: Path, target: str, aliased: str) -> None:
     b = PdfBuilder()
     pages = b.pages
     font = b.add(HELVETICA)
     content = b.add_stream(b"", BENIGN_BODY)
     page = b.add(_page_dict(pages, "F1", font, content))
-    info = b.add(info_dict_bytes("Nullmark bare reference fixture"))
-    alias = b.add(f"{info} 0 R".encode())
+    info = b.add(
+        b"<< /Title "
+        + pdf_str("Nullmark bare reference fixture")
+        + b" /Subject "
+        + pdf_str(f"Records for {target}")
+        + b" >>"
+    )
+    if aliased == "cycle":
+        first = b.reserve()
+        second = b.add(f"{first} 0 R".encode())
+        b.set(first, f"{second} 0 R".encode())
+        alias = first
+    else:
+        alias = b.add(f"{info if aliased == 'dict' else content} 0 R".encode())
     b.finish(path, page, info, catalog_extra=f" /Alias {alias} 0 R")
 
 

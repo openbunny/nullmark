@@ -143,10 +143,11 @@ display.
   annotation or widget `/AP` that bakes in the text rather than deriving it
   from the field value) is not rewritten. The scan detects the target there
   and fails closed for the same reason as an embedded file.
-- A document holding an object whose whole body is a reference to another
-  object (`5 0 obj 4 0 R endobj`) is refused before anything is saved. MuPDF
-  leaks memory saving such an object, and the scrub does not follow it.
-  `mutool clean`, at every garbage-collection level, keeps the construct.
+- An object whose whole body is a reference to another object
+  (`5 0 obj 4 0 R endobj`) is rewritten to hold a copy of the value the
+  reference resolves to, so the scrub reaches it and MuPDF's save does not
+  leak memory on it. Such an object that references a stream, or whose
+  reference does not resolve to a value, is refused before anything is saved.
 - Text that is an image (a scan) has no text layer to remove and is out of
   scope. OCR is not performed.
 - `FileMetadata.apply(to:)` removes the `com.apple.quarantine` and

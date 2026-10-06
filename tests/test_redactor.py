@@ -431,18 +431,38 @@ def test_nul_truncated_string_fails_closed(cli_binary: Path, tmp_path: Path) -> 
     )
 
 
-def test_bare_reference_object_fails_closed(cli_binary: Path, tmp_path: Path) -> None:
+def test_bare_reference_to_dict_is_resolved_and_scrubbed(
+    cli_binary: Path, tmp_path: Path
+) -> None:
     in_pdf = tmp_path / "bareref.pdf"
-    build_bare_reference_only(in_pdf)
+    build_bare_reference_only(in_pdf, TARGET, "dict")
     out_pdf = tmp_path / "bareref.out.pdf"
     result = _run_cli(cli_binary, in_pdf, out_pdf)
-    assert result.returncode != 0, (
-        f"CLI saved an object that is a bare reference; {result.stdout!r}"
-    )
-    assert "reference" in result.stdout, f"wrong refusal; {result.stdout!r}"
-    assert not out_pdf.exists(), (
-        "fail-closed violated: output kept for a bare reference object"
-    )
+    fields = _result_fields(result.stdout)
+    assert fields["rc"] == 0, f"bare reference refused; stdout={result.stdout!r}"
+    assert fields["residual"] == 0, f"residual not zero; stdout={result.stdout!r}"
+    text = _clean(out_pdf, tmp_path / "bareref.clean.pdf")
+    catalog = pdf.object_body(text, pdf.ref_num(pdf.trailer_dict(text), "Root"))
+    alias = pdf.object_body(text, pdf.ref_num(catalog, "Alias"))
+    assert alias.lstrip().startswith("<<"), f"alias still a bare reference: {alias!r}"
+    values = pdf.string_values(alias)
+    assert f"Records for {REPLACEMENT}" in values, f"alias not scrubbed: {values!r}"
+    assert not any(TARGET in v for v in pdf.string_values(text)), "target survived"
+
+
+@pytest.mark.parametrize(
+    ("aliased", "reason"), [("stream", "stream"), ("cycle", "resolve")]
+)
+def test_bare_reference_without_copyable_value_fails_closed(
+    cli_binary: Path, tmp_path: Path, aliased: str, reason: str
+) -> None:
+    in_pdf = tmp_path / f"bareref-{aliased}.pdf"
+    build_bare_reference_only(in_pdf, TARGET, aliased)
+    out_pdf = tmp_path / f"bareref-{aliased}.out.pdf"
+    result = _run_cli(cli_binary, in_pdf, out_pdf)
+    assert result.returncode != 0, f"CLI saved the {aliased} alias; {result.stdout!r}"
+    assert reason in result.stdout, f"wrong refusal; {result.stdout!r}"
+    assert not out_pdf.exists(), f"fail-closed violated for the {aliased} alias"
 
 
 def test_nul_escaped_name_scrubs_clean(cli_binary: Path, tmp_path: Path) -> None:

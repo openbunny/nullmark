@@ -181,10 +181,12 @@ Further coverage beyond the surfaces above:
   the CLI's two input-validation error paths (an empty find string, one over
   `MAX_NEEDLE` codepoints) fail closed with the expected error text and no
   output file.
-- `test_bare_reference_object_fails_closed` builds an object whose whole body
-  is a reference to another object and asserts the CLI refuses it with no
-  output file. MuPDF's save leaks one allocation for each such object, and
-  the scrub does not follow indirect values.
+- `test_bare_reference_to_dict_is_resolved_and_scrubbed` builds an object
+  whose whole body is a reference to the Info dictionary and asserts the
+  output holds a scrubbed copy of that dictionary in its place.
+  `test_bare_reference_without_copyable_value_fails_closed` asserts the same
+  construct pointing at a stream, or at a reference cycle, is refused with no
+  output file.
 - `test_scrub_kitchen_sink_all_surfaces` runs one fixture that carries the
   target on every surface at once (page text, Info, XMP, outline, annotation,
   field), to catch a cross-surface regression that a fixture touching only
