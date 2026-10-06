@@ -5,7 +5,8 @@ import SwiftUI
 
 private let sidebarWidth: CGFloat = 380
 private let dropZonePadding: CGFloat = 28
-private let chooseButtonWidth: CGFloat = 220
+private let puppyWidth: CGFloat = 320
+private let puppyHeight: CGFloat = 220
 private let headerMarkSide: CGFloat = 44
 private let stackedTextSpacing: CGFloat = 2
 private let octalRadix = 8
@@ -114,16 +115,23 @@ struct ContentView: View {
         }
         .padding(Spacing.loose)
     } else {
-      StatusBanner(
-        title: "drop a pdf to begin",
-        message: "its metadata is captured before any change and written back after."
-      ) {
-        NullmarkMark()
-      } actions: {
-        Button("choose pdf…", action: model.choose)
-          .buttonStyle(.outline)
-          .frame(width: chooseButtonWidth)
+      VStack(spacing: Spacing.base) {
+        PuppyView()
+          .frame(width: puppyWidth, height: puppyHeight)
+        HStack(spacing: Spacing.base) {
+          Text("drop or")
+          Button("select", action: model.choose)
+            .buttonStyle(.outline)
+          Text("a pdf for the puppy")
+        }
+        .font(.themeTitle)
+        .foregroundStyle(Color.foreground)
+        Text("its metadata is captured before any change and written back after.")
+          .font(.themeBody)
+          .foregroundStyle(Color.foreground)
+          .multilineTextAlignment(.center)
       }
+      .frame(maxWidth: .infinity, maxHeight: .infinity)
       .background(dropTargeted ? Color.paperDeep : Color.clear)
       .animation(reduceMotion ? nil : .default, value: dropTargeted)
     }
@@ -245,6 +253,24 @@ struct NullmarkMark: View {
       .scaledToFit()
       .foregroundStyle(Color.foreground)
       .accessibilityHidden(true)
+  }
+}
+
+private struct PuppyView: NSViewRepresentable {
+  private static let image = NSDataAsset(name: "Puppy").flatMap { NSImage(data: $0.data) }
+
+  func makeNSView(context _: Context) -> NSImageView {
+    let view = NSImageView()
+    view.animates = true
+    view.imageScaling = .scaleProportionallyUpOrDown
+    view.wantsLayer = true
+    view.layer?.magnificationFilter = .nearest
+    view.setAccessibilityElement(false)
+    return view
+  }
+
+  func updateNSView(_ view: NSImageView, context _: Context) {
+    if view.image !== Self.image { view.image = Self.image }
   }
 }
 

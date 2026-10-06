@@ -135,6 +135,13 @@ The app follows the same component rules as the openbunny websites:
   name is never parsed as Markdown.
 - Weights are the theme's regular and bold; Courier Prime has no semibold.
 
+One exception, granted by the owner, covers the empty state in `preview` in
+`App/Sources/ContentView.swift` and nothing else: it composes its layout in
+place of `StatusBanner`, which takes a plain-string title and cannot hold the
+inline `select` button, and it shows the decorative `PuppyView` animation from
+`App/Assets.xcassets/Puppy.dataset`. Another view that does either follows the
+rules above.
+
 ## Documentation states the present
 
 A document says what is the case. It records no counts, dates, versions,
