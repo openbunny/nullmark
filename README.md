@@ -156,6 +156,7 @@ runs `just install`, then the gates; the CI workflow runs it. See
   behaviour.
 - [CONTRIBUTING.md](CONTRIBUTING.md): development workflow.
 - [MAINTAINERS.md](MAINTAINERS.md): maintainers and succession.
+- [CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md): conduct rules.
 - [AGENTS.md](AGENTS.md): rules for automated contributors.
 
 ## License
