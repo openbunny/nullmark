@@ -33,6 +33,36 @@ ExternalProject_Add(mupdf-source
     "${MUPDF_PREFIX}/lib/libmupdf.a"
     "${MUPDF_PREFIX}/lib/libmupdf-third.a")
 file(MAKE_DIRECTORY "${MUPDF_PREFIX}/include")
+set(MUPDF_LICENSE_FILES
+  mupdf:COPYING
+  brotli:thirdparty/brotli/LICENSE
+  cmark-gfm:thirdparty/cmark-gfm/COPYING
+  extract:thirdparty/extract/COPYING
+  freetype:thirdparty/freetype/LICENSE.TXT
+  freetype:thirdparty/freetype/docs/FTL.TXT
+  gumbo-parser:thirdparty/gumbo-parser/COPYING
+  harfbuzz:thirdparty/harfbuzz/COPYING
+  jbig2dec:thirdparty/jbig2dec/COPYING
+  jbig2dec:thirdparty/jbig2dec/LICENSE
+  lcms2:thirdparty/lcms2/LICENSE
+  libjpeg:thirdparty/libjpeg/README
+  mujs:thirdparty/mujs/COPYING
+  openjpeg:thirdparty/openjpeg/LICENSE
+  zlib:thirdparty/zlib/LICENSE)
+set(MUPDF_LICENSE_COMMANDS)
+foreach(entry IN LISTS MUPDF_LICENSE_FILES)
+  string(REPLACE ":" ";" parts "${entry}")
+  list(GET parts 0 name)
+  list(GET parts 1 file)
+  list(APPEND MUPDF_LICENSE_COMMANDS
+    COMMAND ${CMAKE_COMMAND} -E make_directory "${MUPDF_PREFIX}/licenses/${name}"
+    COMMAND ${CMAKE_COMMAND} -E copy "<SOURCE_DIR>/${file}" "${MUPDF_PREFIX}/licenses/${name}/")
+endforeach()
+# Reason: `cmake -E copy` exits non-zero on a missing file, so a licence file
+# that a MuPDF release moves or drops fails the build.
+ExternalProject_Add_Step(mupdf-source install-licenses
+  DEPENDEES install
+  ${MUPDF_LICENSE_COMMANDS})
 add_library(mupdf-third STATIC IMPORTED)
 set_target_properties(mupdf-third PROPERTIES
   IMPORTED_LOCATION "${MUPDF_PREFIX}/lib/libmupdf-third.a")

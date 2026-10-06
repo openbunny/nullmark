@@ -49,6 +49,9 @@ targets:
       - path: 'CTask4PDF/task4pdf.c'
       - path: 'App/Assets.xcassets'
       - path: 'App/Assets/AppIcon.icon'
+      - path: 'build/dev/mupdf/licenses'
+        type: 'folder'
+        buildPhase: 'resources'
     dependencies:
       - package: 'OpenBunnyTheme'
         product: 'OpenBunnyTheme'
