@@ -2,7 +2,7 @@
 // PDF. A crash or sanitizer report here is a defect in task4pdf.c to fix, never
 // a reason to weaken this harness.
 //
-// An output t4_replace reports clean (rc 0, residual 0) is re-scanned for the raw
+// An output t4_replace reports as verified (rc 0, residual 0) is re-scanned for the raw
 // needle, independently of verify_residual, so a false negative in that scan
 // fails the run. The re-scan reads raw bytes only and cannot see a needle inside
 // a compressed stream.
