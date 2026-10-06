@@ -1,3 +1,4 @@
+import AppKit
 import OpenBunnyTheme
 import OpenBunnyUI
 import SwiftUI
@@ -10,6 +11,9 @@ private let defaultWindowHeight: CGFloat = 800
 
 @main
 struct NullmarkApp: App {
+  @NSApplicationDelegateAdaptor(AppDelegate.self)
+  private var appDelegate
+
   var body: some Scene {
     WindowGroup {
       ContentView()
@@ -28,5 +32,11 @@ struct NullmarkApp: App {
         "Font registration failed, using system fonts: \(error.localizedDescription, privacy: .public)"
       )
     }
+  }
+}
+
+final class AppDelegate: NSObject, NSApplicationDelegate {
+  func applicationShouldTerminateAfterLastWindowClosed(_: NSApplication) -> Bool {
+    true
   }
 }
