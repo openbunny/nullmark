@@ -466,6 +466,11 @@ static int scrub_container(fz_context *ctx, pdf_obj *obj, const char *find, cons
 
 // Loading each numbered object reaches strings and names packed into object
 // streams as well as top-level ones.
+//
+// Hazard: an object whose whole body is a reference to another object leaks
+// one allocation per object inside pdf_save_document (MuPDF renumberobjs
+// keeps the reference it passes to pdf_update_object), and the scrub skips
+// indirect values. Such an input is refused here, before anything is saved.
 static int scrub_metadata_strings(fz_context *ctx, pdf_document *doc, const char *find,
                                   const char *repl) {
     int total = 0;
@@ -475,6 +480,12 @@ static int scrub_metadata_strings(fz_context *ctx, pdf_document *doc, const char
     for (int i = 1; i < count; i++) {
         fz_try(ctx) {
             obj = pdf_load_object(ctx, doc, i);
+            if (pdf_is_indirect(ctx, obj)) {
+                fz_throw(ctx, FZ_ERROR_GENERIC,
+                         "object %d holds only a reference to another object; the rewrite "
+                         "requires every object to hold a value, so the document is refused",
+                         i);
+            }
             pdf_obj *nw = scrub_value(ctx, obj, find, repl);
             if (nw != NULL) {
                 pdf_update_object(ctx, doc, i, nw);

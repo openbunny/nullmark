@@ -11,6 +11,7 @@ import pdfutil as pdf
 from conftest import ROOT
 from fixtures.generate import (
     build_astral_info_only,
+    build_bare_reference_only,
     build_cidfont,
     build_deep_nesting,
     build_incremental_update,
@@ -427,6 +428,20 @@ def test_nul_truncated_string_fails_closed(cli_binary: Path, tmp_path: Path) -> 
     assert "string value" in result.stdout, f"wrong surface refused; {result.stdout!r}"
     assert not out_pdf.exists(), (
         "fail-closed violated: output kept for NUL-blind content"
+    )
+
+
+def test_bare_reference_object_fails_closed(cli_binary: Path, tmp_path: Path) -> None:
+    in_pdf = tmp_path / "bareref.pdf"
+    build_bare_reference_only(in_pdf)
+    out_pdf = tmp_path / "bareref.out.pdf"
+    result = _run_cli(cli_binary, in_pdf, out_pdf)
+    assert result.returncode != 0, (
+        f"CLI saved an object that is a bare reference; {result.stdout!r}"
+    )
+    assert "reference" in result.stdout, f"wrong refusal; {result.stdout!r}"
+    assert not out_pdf.exists(), (
+        "fail-closed violated: output kept for a bare reference object"
     )
 
 

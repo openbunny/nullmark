@@ -683,6 +683,17 @@ def build_trailer_junk_only(path: Path, target: str) -> None:
     )
 
 
+def build_bare_reference_only(path: Path) -> None:
+    b = PdfBuilder()
+    pages = b.pages
+    font = b.add(HELVETICA)
+    content = b.add_stream(b"", BENIGN_BODY)
+    page = b.add(_page_dict(pages, "F1", font, content))
+    info = b.add(info_dict_bytes("Nullmark bare reference fixture"))
+    alias = b.add(f"{info} 0 R".encode())
+    b.finish(path, page, info, catalog_extra=f" /Alias {alias} 0 R")
+
+
 def build_key_only(path: Path, target: str) -> None:
     b = PdfBuilder()
     pages = b.pages
