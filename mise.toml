@@ -11,7 +11,10 @@ lefthook = "2.1.16"
 ninja = "1.13.2"
 osv-scanner = "2.6.0"
 "pipx:gcovr" = "8.6"
-"pipx:reuse" = { version = "6.2.0", extras = "charset-normalizer" }
+# Reason: reuse ships no macOS wheel, and a locked uv dependency graph is
+# replayed without source builds, so reuse installs through pipx.
+"pipx:reuse" = { version = "6.2.0", extras = "charset-normalizer", uvx = false }
+pipx = "1.17.11"
 python = "3.14.8"
 ruff = "0.16.10"
 shellcheck = "0.11.0"

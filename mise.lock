@@ -296,6 +296,41 @@ checksum = "sha256:e0ed7644118b717b028c249ee9d3515024e55e8510747ca08906eb9676535
 url = "https://github.com/google/osv-scanner/releases/download/v2.6.0/osv-scanner_windows_amd64.exe"
 url_api = "https://api.github.com/repos/google/osv-scanner/releases/assets/562414649"
 
+[[tools.pipx]]
+version = "1.17.11"
+backend = "aqua:pypa/pipx"
+specifiers = ["1.17.11"]
+
+[tools.pipx."platforms.linux-arm64"]
+checksum = "sha256:ea1a87594acaddb6ed3956d587c07bcd28122c98943018d5469a225bcbc9d554"
+url = "https://github.com/pypa/pipx/releases/download/1.17.11/pipx.pyz"
+url_api = "https://api.github.com/repos/pypa/pipx/releases/assets/608756700"
+
+[tools.pipx."platforms.linux-arm64-musl"]
+checksum = "sha256:ea1a87594acaddb6ed3956d587c07bcd28122c98943018d5469a225bcbc9d554"
+url = "https://github.com/pypa/pipx/releases/download/1.17.11/pipx.pyz"
+url_api = "https://api.github.com/repos/pypa/pipx/releases/assets/608756700"
+
+[tools.pipx."platforms.linux-x64"]
+checksum = "sha256:ea1a87594acaddb6ed3956d587c07bcd28122c98943018d5469a225bcbc9d554"
+url = "https://github.com/pypa/pipx/releases/download/1.17.11/pipx.pyz"
+url_api = "https://api.github.com/repos/pypa/pipx/releases/assets/608756700"
+
+[tools.pipx."platforms.linux-x64-musl"]
+checksum = "sha256:ea1a87594acaddb6ed3956d587c07bcd28122c98943018d5469a225bcbc9d554"
+url = "https://github.com/pypa/pipx/releases/download/1.17.11/pipx.pyz"
+url_api = "https://api.github.com/repos/pypa/pipx/releases/assets/608756700"
+
+[tools.pipx."platforms.macos-arm64"]
+checksum = "sha256:ea1a87594acaddb6ed3956d587c07bcd28122c98943018d5469a225bcbc9d554"
+url = "https://github.com/pypa/pipx/releases/download/1.17.11/pipx.pyz"
+url_api = "https://api.github.com/repos/pypa/pipx/releases/assets/608756700"
+
+[tools.pipx."platforms.macos-x64"]
+checksum = "sha256:ea1a87594acaddb6ed3956d587c07bcd28122c98943018d5469a225bcbc9d554"
+url = "https://github.com/pypa/pipx/releases/download/1.17.11/pipx.pyz"
+url_api = "https://api.github.com/repos/pypa/pipx/releases/assets/608756700"
+
 [[tools."pipx:gcovr"]]
 version = "8.6"
 backend = "pipx:gcovr"
@@ -309,6 +344,7 @@ specifiers = ["6.2.0"]
 
 [tools."pipx:reuse".options]
 extras = "charset-normalizer"
+uvx = "false"
 
 [[tools.python]]
 version = "3.14.8"
