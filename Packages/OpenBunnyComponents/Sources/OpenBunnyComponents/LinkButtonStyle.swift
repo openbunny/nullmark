@@ -4,11 +4,11 @@ import SwiftUI
 
 private let disabledOpacity = 0.5
 
-struct LinkButtonStyle: ButtonStyle {
+public struct LinkButtonStyle: ButtonStyle {
   @Environment(\.isEnabled)
   private var isEnabled
 
-  func makeBody(configuration: Configuration) -> some View {
+  public func makeBody(configuration: Configuration) -> some View {
     configuration.label
       .font(.themeBody)
       .foregroundStyle(Color.ink)
@@ -19,5 +19,6 @@ struct LinkButtonStyle: ButtonStyle {
 }
 
 extension ButtonStyle where Self == LinkButtonStyle {
-  static var inkLink: LinkButtonStyle { LinkButtonStyle() }
+  /// Ink text with a line-coloured underline, the websites' `.link` class.
+  public static var inkLink: LinkButtonStyle { LinkButtonStyle() }
 }

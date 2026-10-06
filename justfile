@@ -6,7 +6,7 @@ export PATH := "/opt/homebrew/opt/llvm/bin:" + env("PATH")
 
 c_sources := "CTask4PDF/*.c CTask4PDF/*/*.[ch] AppTests/Support/*.c App/*.h"
 
-check: fmt-check lint typecheck test xctest fuzz coverage actions secrets reuse
+check: fmt-check lint typecheck test components xctest fuzz coverage actions secrets reuse
 
 ci-check: install check
 
@@ -17,12 +17,12 @@ install:
 
 fmt:
     clang-format -i {{ c_sources }}
-    swift format format --in-place --recursive App AppTests
+    swift format format --in-place --recursive App AppTests Packages
     ruff format tests
 
 fmt-check:
     clang-format --dry-run --Werror {{ c_sources }}
-    swift format lint --strict --recursive App AppTests
+    swift format lint --strict --recursive App AppTests Packages
     ruff format --check tests
 
 lint: build
@@ -38,6 +38,9 @@ typecheck:
 
 test: build
     ctest --preset pytest
+
+components:
+    swift test --package-path Packages/OpenBunnyComponents
 
 xctest:
     xcodegen generate

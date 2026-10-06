@@ -3,7 +3,7 @@ import OpenBunnyTheme
 import OpenBunnyUI
 import SwiftUI
 
-struct CopyButton: View {
+public struct CopyButton: View {
   private enum CopyState {
     case idle
     case copied
@@ -14,20 +14,20 @@ struct CopyButton: View {
   private static let dimDelayMilliseconds = 450
   private static let resetDelayMilliseconds = 1_150
 
-  let text: String
-  let label: String
-  var caption = "copy"
-  var copiedCaption = "copied"
-  var failureHint = "select the text and copy by hand."
+  private let text: String
+  private let label: String
+  private let caption: String
+  private let copiedCaption: String
+  private let failureHint: String
 
   @State private var state: CopyState = .idle
   @State private var dimmed = false
   @State private var cycle = 0
 
-  var body: some View {
+  public var body: some View {
     VStack(alignment: .trailing, spacing: Spacing.tight) {
       Button(action: copy) {
-        Text(dimmed ? copiedCaption : caption)
+        Text(verbatim: dimmed ? copiedCaption : caption)
       }
       .buttonStyle(.outline)
       .accessibilityLabel(label)
@@ -47,6 +47,20 @@ struct CopyButton: View {
       try? await Task.sleep(for: .milliseconds(Self.resetDelayMilliseconds))
       if !Task.isCancelled { state = .idle }
     }
+  }
+
+  public init(
+    text: String,
+    label: String,
+    caption: String = "copy",
+    copiedCaption: String = "copied",
+    failureHint: String = "select the text and copy by hand."
+  ) {
+    self.text = text
+    self.label = label
+    self.caption = caption
+    self.copiedCaption = copiedCaption
+    self.failureHint = failureHint
   }
 
   private func copy() {

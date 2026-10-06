@@ -5,7 +5,7 @@ import SwiftUI
 private struct ComponentGallery: View {
   private static let bannerHeight: CGFloat = 260
   private static let canvasWidth: CGFloat = 640
-  private static let canvasHeight: CGFloat = 1_040
+  private static let canvasHeight: CGFloat = 1_180
 
   private let fontFailure: FontError? = {
     do throws(FontError) {
@@ -31,7 +31,8 @@ private struct ComponentGallery: View {
         PageSection(number: "02", title: "command line and copy button") { commandSamples }
         PageSection(number: "03", title: "outline and link buttons") { buttonSamples }
         PageSection(number: "04", title: "field, chip and key/value grid") { fieldSamples }
-        PageSection(number: "05", title: "status banner") { bannerSample }
+        PageSection(number: "05", title: "status messages") { statusSamples }
+        PageSection(number: "06", title: "status banner") { bannerSample }
       }
       .padding(Spacing.loose)
     }
@@ -41,7 +42,8 @@ private struct ComponentGallery: View {
   }
 
   @ViewBuilder private var commandSamples: some View {
-    CommandLine(command: #"nullmark-cli --find "Old Name" --replace "New Name" in.pdf out.pdf"#)
+    ShellCommandLine(
+      command: #"nullmark-cli --find "Old Name" --replace "New Name" in.pdf out.pdf"#)
     CopyButton(text: "copied text", label: "copy sample text")
   }
 
@@ -55,15 +57,23 @@ private struct ComponentGallery: View {
 
   @ViewBuilder private var fieldSamples: some View {
     LabeledField(label: "find", placeholder: "text in the pdf", text: $field)
-    Chip(text: "edited")
+    Chip("edited")
     KeyValueGroup(title: "document") {
       KeyValueRow(key: "pdf version", value: "1.7")
       KeyValueRow(key: "xmp packet", value: "none")
     }
   }
 
+  @ViewBuilder private var statusSamples: some View {
+    StatusMessage("metadata captured. enter the text to replace.", tone: .neutral)
+    StatusMessage("replaced 2 occurrences across 1 page.", tone: .valid)
+    StatusMessage(#""old name" does not occur in the pdf's text layer."#, tone: .failed)
+  }
+
   private var bannerSample: some View {
     StatusBanner(title: "drop a pdf to begin", message: "status banner with one action.") {
+      Rectangle().stroke(Color.border, lineWidth: Metric.borderWidth)
+    } actions: {
       Button("choose pdf…") { taps += 1 }.buttonStyle(.outline)
     }
     .frame(height: Self.bannerHeight)

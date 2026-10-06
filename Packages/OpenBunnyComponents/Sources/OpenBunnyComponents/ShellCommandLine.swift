@@ -2,14 +2,14 @@ import OpenBunnyTheme
 import OpenBunnyUI
 import SwiftUI
 
-struct CommandLine: View {
-  let command: String
-  var copyLabel: String?
+public struct ShellCommandLine: View {
+  private let command: String
+  private let copyLabel: String?
 
-  var body: some View {
+  public var body: some View {
     HStack(alignment: .center, spacing: Spacing.base) {
       HStack(spacing: 0) {
-        Text("$ ").foregroundStyle(Color.muted)
+        Text(verbatim: "$ ").foregroundStyle(Color.muted)
         tokenText
       }
       .font(.themeMono)
@@ -26,13 +26,18 @@ struct CommandLine: View {
   }
 
   private var tokenText: Text {
-    shellTokens(command).reduce(Text("")) { partial, token in
+    shellTokens(command).reduce(Text(verbatim: "")) { partial, token in
       Text("\(partial)\(style(token))")
     }
   }
 
+  public init(command: String, copyLabel: String? = nil) {
+    self.command = command
+    self.copyLabel = copyLabel
+  }
+
   private func style(_ token: ShellToken) -> Text {
-    let base = Text(token.text)
+    let base = Text(verbatim: token.text)
     switch token.kind {
     case .command:
       return base.bold().foregroundStyle(Color.foreground)
@@ -49,19 +54,24 @@ struct CommandLine: View {
   }
 }
 
-enum ShellTokenKind {
+public enum ShellTokenKind: Sendable, Equatable {
   case command
   case flag
   case string
   case text
 }
 
-struct ShellToken {
-  let kind: ShellTokenKind
-  let text: String
+public struct ShellToken: Sendable, Equatable {
+  public let kind: ShellTokenKind
+  public let text: String
+
+  public init(kind: ShellTokenKind, text: String) {
+    self.kind = kind
+    self.text = text
+  }
 }
 
-enum ShellSplitError: Error {
+enum ShellSplitError: Error, Equatable {
   case unbalancedQuote
 }
 
@@ -106,7 +116,9 @@ func classify(_ piece: String, atCommand: Bool) -> ShellTokenKind {
   return .text
 }
 
-func shellTokens(_ command: String) -> [ShellToken] {
+/// Splits a shell command into command, flag, string and text tokens. An
+/// unbalanced quote returns the whole command as one text token.
+public func shellTokens(_ command: String) -> [ShellToken] {
   let pieces: [String]
   do {
     pieces = try splitPieces(command)

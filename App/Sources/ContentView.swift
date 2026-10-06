@@ -1,3 +1,4 @@
+import OpenBunnyComponents
 import OpenBunnyTheme
 import OpenBunnyUI
 import PDFKit
@@ -106,7 +107,7 @@ struct ContentView: View {
       PDFKitView(document: document)
         .overlay(Rectangle().stroke(Color.border, lineWidth: Metric.borderWidth))
         .overlay(alignment: .topTrailing) {
-          Chip(text: model.edited ? "edited" : "original")
+          Chip(model.edited ? "edited" : "original")
             .padding(Spacing.base)
         }
         .padding(Spacing.loose)
@@ -115,6 +116,8 @@ struct ContentView: View {
         title: "drop a pdf to begin",
         message: "its metadata is captured before any change and written back after."
       ) {
+        NullmarkMark()
+      } actions: {
         Button("choose pdf…", action: model.choose)
           .buttonStyle(.outline)
           .frame(width: chooseButtonWidth)
@@ -201,22 +204,17 @@ struct ContentView: View {
     }
   }
 
-  private func statusLine(_ status: EditorModel.Status) -> some View {
-    let (text, color): (String, Color) =
-      switch status {
-      case .info(let text):
-        (text, Color.foreground)
+  private func statusLine(_ status: EditorModel.Status) -> StatusMessage {
+    switch status {
+    case .info(let text):
+      StatusMessage(text, tone: .neutral)
 
-      case .success(let text):
-        (text, Status.enabled.color)
+    case .success(let text):
+      StatusMessage(text, tone: .valid)
 
-      case .failure(let text):
-        (text, Status.disabled.color)
-      }
-    return Text(verbatim: text)
-      .font(.themeBody)
-      .foregroundStyle(color)
-      .fixedSize(horizontal: false, vertical: true)
+    case .failure(let text):
+      StatusMessage(text, tone: .failed)
+    }
   }
 }
 

@@ -21,6 +21,9 @@ it refuses.
   with `-DT4_MAIN`.
 - `App/Sources/`: the SwiftUI app. `PDFEngine` is the only code that calls
   `t4_replace`.
+- `Packages/OpenBunnyComponents/`: the SwiftUI components the app is built
+  from, a package that depends only on the OpenBunny theme. See its
+  [README](../Packages/OpenBunnyComponents/README.md).
 - `tests/`: the pytest suite for the C core, run against the CLI. See
   [tests/README.md](../tests/README.md).
 - `CMakeLists.txt` and `CMakePresets.json`: the C build of the CLI, the fuzz

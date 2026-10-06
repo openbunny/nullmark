@@ -5,11 +5,11 @@ import SwiftUI
 private let minimumHeight: CGFloat = 24
 private let disabledOpacity = 0.5
 
-struct OutlineButtonStyle: ButtonStyle {
+public struct OutlineButtonStyle: ButtonStyle {
   @Environment(\.isEnabled)
   private var isEnabled
 
-  func makeBody(configuration: Configuration) -> some View {
+  public func makeBody(configuration: Configuration) -> some View {
     configuration.label
       .font(.themeCaption)
       .foregroundStyle(Color.foreground)
@@ -24,5 +24,6 @@ struct OutlineButtonStyle: ButtonStyle {
 }
 
 extension ButtonStyle where Self == OutlineButtonStyle {
-  static var outline: OutlineButtonStyle { OutlineButtonStyle() }
+  /// A square, 1-point bordered button in the caption face, dimmed when disabled.
+  public static var outline: OutlineButtonStyle { OutlineButtonStyle() }
 }

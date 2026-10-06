@@ -1,16 +1,19 @@
 import OpenBunnyTheme
-import OpenBunnyUI
 import SwiftUI
 
-struct Chip: View {
-  let text: String
+public struct Chip: View {
+  private let text: String
 
-  var body: some View {
-    Text(text)
+  public var body: some View {
+    Text(verbatim: text)
       .font(.themeCaption)
       .foregroundStyle(Color.foreground)
       .padding(.horizontal, Spacing.base)
       .padding(.vertical, Spacing.tight)
       .background(Color.paperDeep)
+  }
+
+  public init(_ text: String) {
+    self.text = text
   }
 }

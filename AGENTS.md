@@ -123,8 +123,10 @@ The app follows the same component rules as the openbunny websites:
   literal (a file name, a PDF key, `U+0000`) keeps its own case.
 - Sections are `PageSection`: a 1-point `border` rule above a numbered
   `SectionHeading`. At most two regions carry a filled ground.
-- Building blocks live in `App/Sources/Components/` and each appears in
-  `ComponentGallery`; a view-local copy of one is a second system.
+- Building blocks live in the local package `Packages/OpenBunnyComponents`,
+  which depends only on the theme so it can move to an OpenBunny repository.
+  Each appears in its `ComponentGallery`; a view-local copy of one is a second
+  system, and nothing app-specific enters the package.
 - `sprout` marks state only. A link uses `LinkButtonStyle`: `ink` text with a
   `line` underline.
 - No decorative icons. Text drawn from data is `Text(verbatim:)`, so a file

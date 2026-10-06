@@ -1,6 +1,9 @@
 included:
   - 'App'
   - 'AppTests'
+  - 'Packages'
+excluded:
+  - 'Packages/*/.build'
 opt_in_rules:
   - 'all'
 disabled_rules:
@@ -10,6 +13,7 @@ disabled_rules:
   - 'explicit_acl' # swift.md: module access is the default.
   - 'explicit_top_level_acl' # swift.md: module access is the default.
   - 'explicit_type_interface' # swift.md: types are inferred where the compiler can.
+  - 'extension_access_modifier' # swift-format moves an extension's access modifier onto each member.
   - 'multiline_arguments_brackets' # swift-format keeps a closing bracket on the last argument's line.
   - 'one_declaration_per_file' # swift.md: access is narrow, and a private helper view would widen to move.
   - 'prefixed_toplevel_constant' # swift.md: constants use lowerCamelCase, with no `k` prefix.
