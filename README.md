@@ -18,6 +18,7 @@ That is a field-level guarantee, not whole-file byte identity. See
 
 - [What it does](#what-it-does)
 - [Install](#install)
+- [Use](#use)
 - [Security](#security)
 - [What preservation means at the byte level](#what-preservation-means-at-the-byte-level)
 - [Sandbox and hardened runtime](#sandbox-and-hardened-runtime)
@@ -49,20 +50,47 @@ The app does not perform OCR.
 
 ## Install
 
-Build from a clone:
+No signed or notarized build is published; the app is built from source. A
+build links `libmupdf.dylib` from Homebrew at `/opt/homebrew/opt/mupdf/lib`, so
+it runs only on a Mac with Homebrew MuPDF installed, and it is ad-hoc signed
+(`Signing.xcconfig`). Without Homebrew MuPDF the app does not launch: dyld
+reports `Library not loaded: /opt/homebrew/opt/mupdf/lib/libmupdf.dylib`.
+
+Requirements:
+
+- macOS 27 or later on Apple silicon (`MACOSX_DEPLOYMENT_TARGET` in
+  `project.yml`; the build searches the Apple-silicon Homebrew prefix
+  `/opt/homebrew`).
+- Xcode 27 (`.xcode-version`).
+- Homebrew: `brew install mupdf mise`. The gates also need
+  `brew install llvm cppcheck`.
+
+Build and run:
 
 ```sh
 just install
-just xctest
+just app
+open build/app/Build/Products/Release/Nullmark.app
 ```
 
 `just install` installs the toolchain pinned in `mise.toml`, the Python
-environment from `tests/uv.lock` and the git hooks from `lefthook.yml`. Xcode,
-and MuPDF, LLVM (clang-format, clang-tidy, LeakSanitizer, libFuzzer, llvm-cov)
-and cppcheck under `/opt/homebrew`, come from the machine; the header of the
-`justfile` lists them. `just --list` prints every recipe.
+environment from `tests/uv.lock` and the git hooks from `lefthook.yml`.
+`just app` generates `Nullmark.xcodeproj` from `project.yml` with `xcodegen` and
+builds a Release app. `just --list` prints every recipe.
 
-`Signing.xcconfig` builds ad-hoc signed with no team.
+## Use
+
+1. Drop a PDF on the window, or choose **choose pdf…**. The app captures the
+   document's metadata before any change.
+2. Enter the text to find and its replacement, then choose **apply
+   replacement** (⌘↩). Matching is case-sensitive.
+3. The status line reports the outcome. A success means the independent scan of
+   the output found no remaining occurrence on any text surface. A failure
+   leaves the document unchanged. Text in a scan is neither found nor changed.
+4. Choose **export pdf…** (⌘S) to write the edited copy to a new file. The
+   original file is not modified. The export restores the creation and
+   modification dates, permissions and extended attributes, and reports any
+   that differ.
 
 ## Security
 

@@ -39,6 +39,10 @@ typecheck:
 test: build
     ctest --preset pytest
 
+app:
+    xcodegen generate
+    xcodebuild build -project Nullmark.xcodeproj -scheme Nullmark -configuration Release -derivedDataPath build/app
+
 xctest:
     xcodegen generate
     xcodebuild test -project Nullmark.xcodeproj -scheme Nullmark CODE_SIGNING_ALLOWED=NO
