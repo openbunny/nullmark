@@ -209,7 +209,7 @@ def test_empty_target_fails_closed(
             "fail-closed violated: output kept for an empty target; "
             f"stdout={result.stdout!r}"
         )
-        assert "empty" in result.stdout, (
+        assert "empty" in result.stdout.lower(), (
             f"no explanatory error for an empty target; stdout={result.stdout!r}"
         )
 

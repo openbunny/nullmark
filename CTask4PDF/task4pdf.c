@@ -81,7 +81,8 @@ static void sanitize_trailer(fz_context *ctx, pdf_document *doc) {
     if (id != NULL && !(pdf_is_array(ctx, id) && pdf_array_len(ctx, id) == ID_DIGEST_COUNT &&
                         pdf_is_string(ctx, pdf_array_get(ctx, id, 0)) &&
                         pdf_is_string(ctx, pdf_array_get(ctx, id, 1)))) {
-        fz_throw(ctx, FZ_ERROR_GENERIC, "trailer /ID is not an array of two strings");
+        fz_throw(ctx, FZ_ERROR_GENERIC,
+                 "trailer /ID is not an array of two strings; the document is refused");
     }
 }
 
@@ -366,7 +367,8 @@ static unsigned char *encode_utf16le(fz_context *ctx, const char *utf8, size_t *
 static pdf_obj *scrub_string_value(fz_context *ctx, pdf_obj *str, const char *find,
                                    const char *repl) {
     if (decoded_text_is_nul_truncated(ctx, str)) {
-        fz_throw(ctx, FZ_ERROR_GENERIC, "string value holds an embedded NUL byte");
+        fz_throw(ctx, FZ_ERROR_GENERIC,
+                 "string value holds an embedded NUL byte; the document is refused");
     }
     const char *decoded = pdf_to_text_string(ctx, str);
     fz_buffer *replaced = str_replace_all(ctx, decoded, find, repl);
@@ -421,7 +423,8 @@ static pdf_obj *scrub_value(fz_context *ctx, pdf_obj *val, const char *find, con
 static int scrub_container(fz_context *ctx, pdf_obj *obj, const char *find, const char *repl,
                            int depth) {
     if (depth > MAX_CONTAINER_DEPTH) {
-        fz_throw(ctx, FZ_ERROR_GENERIC, "object nesting exceeds the depth limit of %d",
+        fz_throw(ctx, FZ_ERROR_GENERIC,
+                 "object nesting exceeds the depth limit of %d; the document is refused",
                  MAX_CONTAINER_DEPTH);
     }
     int changed = 0;
@@ -586,7 +589,8 @@ static fz_buffer *load_stream_capped(fz_context *ctx, pdf_document *doc, int num
             }
             total += n;
             if (total > MAX_DECOMPRESSED_STREAM_BYTES) {
-                fz_throw(ctx, FZ_ERROR_GENERIC, "stream %d decompresses beyond the %d-byte cap",
+                fz_throw(ctx, FZ_ERROR_GENERIC,
+                         "stream %d decompresses beyond the %d-byte cap; the document is refused",
                          num, MAX_DECOMPRESSED_STREAM_BYTES);
             }
             fz_append_data(ctx, buf, chunk, n);
@@ -717,13 +721,15 @@ static int64_t count_id_needles(fz_context *ctx, pdf_obj *arr, const char *find,
 
 static int64_t scan_container_strings(fz_context *ctx, pdf_obj *obj, const char *find, int depth) {
     if (depth > MAX_CONTAINER_DEPTH) {
-        fz_throw(ctx, FZ_ERROR_GENERIC, "object nesting exceeds the depth limit of %d",
+        fz_throw(ctx, FZ_ERROR_GENERIC,
+                 "object nesting exceeds the depth limit of %d; the document is refused",
                  MAX_CONTAINER_DEPTH);
     }
     int64_t total = 0;
     if (pdf_is_string(ctx, obj)) {
         if (decoded_text_is_nul_truncated(ctx, obj)) {
-            fz_throw(ctx, FZ_ERROR_GENERIC, "string value holds an embedded NUL byte");
+            fz_throw(ctx, FZ_ERROR_GENERIC,
+                     "string value holds an embedded NUL byte; the document is refused");
         }
         const char *decoded = pdf_to_text_string(ctx, obj);
         total += count_needle_bytes((const unsigned char *)decoded, strlen(decoded),
@@ -1338,20 +1344,24 @@ int t4_replace(const char *in_path, const char *out_path, const char *find, cons
     int needle[MAX_NEEDLE];
     int needle_len = decode_codepoints(find, needle, MAX_NEEDLE);
     if (needle_len == 0) {
-        (void)snprintf(out->error, sizeof out->error, "The text to replace is empty.");
+        (void)snprintf(out->error, sizeof out->error,
+                       "the text to replace is empty. enter the text to remove.");
         discard_output(out_path);
         return 1;
     }
     if (needle_len > MAX_NEEDLE) {
-        (void)snprintf(out->error, sizeof out->error,
-                       "The text to replace is longer than the %d-character limit.", MAX_NEEDLE);
+        (void)snprintf(
+            out->error, sizeof out->error,
+            "the text to replace is longer than the %d-codepoint limit. shorten it and try again.",
+            MAX_NEEDLE);
         discard_output(out_path);
         return 1;
     }
 
     fz_context *ctx = fz_new_context(NULL, NULL, FZ_STORE_DEFAULT);
     if (!ctx) {
-        (void)snprintf(out->error, sizeof out->error, "MuPDF context could not be created.");
+        (void)snprintf(out->error, sizeof out->error,
+                       "MuPDF context could not be created. restart the app and try again.");
         discard_output(out_path);
         return 1;
     }
@@ -1399,7 +1409,9 @@ int t4_replace(const char *in_path, const char *out_path, const char *find, cons
                 ropts.line_art = PDF_REDACT_LINE_ART_NONE;
                 ropts.text = PDF_REDACT_TEXT_REMOVE;
                 if (!pdf_redact_page(ctx, doc, page, &ropts)) {
-                    fz_throw(ctx, FZ_ERROR_GENERIC, "redaction removed nothing on page %d", i + 1);
+                    fz_throw(ctx, FZ_ERROR_GENERIC,
+                             "redaction removed nothing on page %d; the document is refused",
+                             i + 1);
                 }
 
                 dev = pdf_page_write(ctx, doc, bbox, &resources, &contents);
@@ -1469,7 +1481,8 @@ int t4_replace(const char *in_path, const char *out_path, const char *find, cons
     int rc = 0;
     fz_try(ctx) { out->residual = verify_residual(ctx, out_path, find, needle, needle_len); }
     fz_catch(ctx) {
-        (void)snprintf(out->error, sizeof out->error, "Output verification could not run: %s",
+        (void)snprintf(out->error, sizeof out->error,
+                       "output verification could not run: %s. no output was written.",
                        fz_caught_message(ctx));
         rc = 1;
     }
