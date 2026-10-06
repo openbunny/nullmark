@@ -165,9 +165,12 @@ The output has no second `%%EOF`, no `/Prev` and no MuPDF version string. It
 keeps the versionless `% Written by MuPDF` comment that the save writes.
 
 Filesystem metadata (dates, permissions, extended attributes) is reapplied on
-export. `FileMetadata.apply` also strips the `com.apple.quarantine` and
-`com.apple.provenance` extended attributes the OS adds to the exported file, so
-the export does not carry a record of the machine that produced it.
+export, except the `com.apple.quarantine`, `com.apple.provenance` and
+`com.apple.macl` extended attributes. macOS writes those on every file the
+sandboxed app creates and refuses or overrides a value the app sets, so the
+export carries the app's quarantine record and provenance, not the original's.
+`FileMetadata.differences` excludes them, and the export's success message
+names them.
 
 ## Sandbox and hardened runtime
 

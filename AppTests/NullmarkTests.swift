@@ -42,6 +42,25 @@ struct NullmarkTests {
     }
   }
 
+  @Test(arguments: [
+    ("com.apple.quarantine", [String]()),
+    ("user.nullmark", ["user.nullmark (changed)"]),
+  ])
+  func differencesExcludeSystemOwnedAttributes(_ name: String, _ expected: [String]) throws {
+    let url = FileManager.default.temporaryDirectory
+      .appendingPathComponent("\(UUID().uuidString).pdf")
+    try Data().write(to: url)
+    defer { try? FileManager.default.removeItem(at: url) }
+    let metadata = try ["original", "export"].map { value in
+      let status = value.withCString { bytes in
+        unsafe setxattr(url.path, name, bytes, strlen(bytes), 0, XATTR_NOFOLLOW)
+      }
+      try #require(status == 0, "setxattr \(name) failed: errno \(errno)")
+      return try FileMetadata(url: url)
+    }
+    #expect(metadata[0].differences(from: metadata[1]) == expected)
+  }
+
   @Test(.timeLimit(.minutes(1)))
   func applyDropsStaleGeneration() async throws {
     let model = try await withDelayedFirstApply { model, _ in

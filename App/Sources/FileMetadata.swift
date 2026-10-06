@@ -27,7 +27,9 @@ struct FileMetadata: Equatable {
   private static let keys: Set<URLResourceKey> = [
     .creationDateKey, .contentModificationDateKey, .contentAccessDateKey, .hasHiddenExtensionKey,
   ]
-  private static let osAddedAttributes = ["com.apple.quarantine", "com.apple.provenance"]
+  static let systemOwnedAttributes = [
+    "com.apple.macl", "com.apple.provenance", "com.apple.quarantine",
+  ]
 
   let created: Date?
   let modified: Date?
@@ -36,6 +38,10 @@ struct FileMetadata: Equatable {
   // swiftlint:disable:next discouraged_optional_boolean - absence is distinct from a false flag
   let extensionHidden: Bool?
   let extendedAttributes: [String: Data]
+
+  var copiedAttributes: [String: Data] {
+    extendedAttributes.filter { !Self.systemOwnedAttributes.contains($0.key) }
+  }
 
   init(url: URL) throws {
     guard
@@ -92,7 +98,7 @@ struct FileMetadata: Equatable {
 
   func apply(to url: URL) throws -> [String] {
     var refused: [String] = []
-    for (name, value) in extendedAttributes.sorted(by: { $0.key < $1.key }) {
+    for (name, value) in copiedAttributes.sorted(by: { $0.key < $1.key }) {
       let status = unsafe value.withUnsafeBytes { bytes in
         unsafe setxattr(url.path, name, bytes.baseAddress, value.count, 0, XATTR_NOFOLLOW)
       }
@@ -111,11 +117,6 @@ struct FileMetadata: Equatable {
     if let extensionHidden { values.hasHiddenExtension = extensionHidden }
     var target = url
     try target.setResourceValues(values)
-    for name in Self.osAddedAttributes where extendedAttributes[name] == nil {
-      if unsafe removexattr(url.path, name, XATTR_NOFOLLOW) != 0, errno != ENOATTR {
-        refused.append("\(name) removal (\(unsafe String(cString: strerror(errno))))")
-      }
-    }
     return refused
   }
 
@@ -125,12 +126,14 @@ struct FileMetadata: Equatable {
     if modified != other.modified { result.append("modification date") }
     if permissions != other.permissions { result.append("permissions") }
     if extensionHidden != other.extensionHidden { result.append("hidden extension") }
-    let expectedNames = Set(extendedAttributes.keys)
-    let actualNames = Set(other.extendedAttributes.keys)
+    let expected = copiedAttributes
+    let actual = other.copiedAttributes
+    let expectedNames = Set(expected.keys)
+    let actualNames = Set(actual.keys)
     let missing = expectedNames.subtracting(actualNames).map { "\($0) (missing)" }
     let added = actualNames.subtracting(expectedNames).map { "\($0) (added)" }
     let changed = expectedNames.intersection(actualNames)
-      .filter { extendedAttributes[$0] != other.extendedAttributes[$0] }
+      .filter { expected[$0] != actual[$0] }
       .map { "\($0) (changed)" }
     result.append(contentsOf: (missing + added + changed).sorted())
     return result

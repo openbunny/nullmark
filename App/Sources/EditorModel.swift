@@ -232,12 +232,14 @@ final class EditorModel {
           try Self.write(data: data, metadata: fileMetadata, to: url)
         }.value
         if diff.refused.isEmpty, diff.differences.isEmpty {
-          let count = fileMetadata.extendedAttributes.count
+          let count = fileMetadata.copiedAttributes.count
           let attributes = "\(count) extended attribute\(count == 1 ? "" : "s")"
+          let systemOwned = FileMetadata.systemOwnedAttributes.joined(separator: ", ")
           self.status = .success(
             """
             saved \(url.lastPathComponent). creation and modification dates, permissions \
-            and \(attributes) verified identical.
+            and \(attributes) verified identical. macos sets \(systemOwned) on the \
+            exported file itself, so they were not copied.
             """
           )
         } else {
