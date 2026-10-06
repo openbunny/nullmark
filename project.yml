@@ -13,9 +13,7 @@ configFiles:
 packages:
   OpenBunnyTheme:
     url: 'https://github.com/openbunny/theme'
-    version: '0.1.1'
-  OpenBunnyComponents:
-    path: 'Packages/OpenBunnyComponents'
+    version: '0.2.0'
 settings:
   base:
     MACOSX_DEPLOYMENT_TARGET: '27.0'
@@ -58,8 +56,6 @@ targets:
         product: 'OpenBunnyTheme'
       - package: 'OpenBunnyTheme'
         product: 'OpenBunnyUI'
-      - package: 'OpenBunnyComponents'
-        product: 'OpenBunnyComponents'
     settings:
       base:
         ASSETCATALOG_COMPILER_APPICON_NAME: 'AppIcon'

@@ -1,9 +1,6 @@
 included:
   - 'App'
   - 'AppTests'
-  - 'Packages'
-excluded:
-  - 'Packages/*/.build'
 opt_in_rules:
   - 'all'
 disabled_rules:
