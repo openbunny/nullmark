@@ -72,8 +72,12 @@ disable them. Do not re-enable either without resolving that.
 - `just fuzz` is also the sanitizer gate: ASan, UBSan and LeakSanitizer run
   together over the seed corpus. A reproducer libFuzzer writes under
   `CTask4PDF/fuzz/` joins the corpus once its fix lands.
-- `clang-tidy` reads its compile flags from `compile_flags.txt` and lints every
-  tracked C file. `cppcheck` carries its own suppressions list.
+- `CMakeLists.txt` builds the CLI, the fuzz target and the coverage runner;
+  `CMakePresets.json` holds the configurations. The `dev` preset runs
+  `clang-tidy` and `cppcheck` on every C file a CMake target compiles, so a C
+  file outside every target is unlinted. `cppcheck` carries its own suppressions
+  list. Build and test steps are CMake and CTest configuration, not shell
+  commands in the `justfile`.
 - Allocation failure and parse failure are distinct: they produce distinct
   `T4Result.error` text, never one message for both causes.
 

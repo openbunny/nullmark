@@ -1,4 +1,0 @@
--std=c11
--DT4_MAIN
--ICTask4PDF/include
--I/opt/homebrew/include

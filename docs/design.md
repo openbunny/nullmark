@@ -23,6 +23,9 @@ it refuses.
   `t4_replace`.
 - `tests/`: the pytest suite for the C core, run against the CLI. See
   [tests/README.md](../tests/README.md).
+- `CMakeLists.txt` and `CMakePresets.json`: the C build of the CLI, the fuzz
+  target and the coverage runner, and the CTest entries for pytest and the
+  fuzzer. `gcovr.cfg` configures the coverage report.
 - `project.yml`: the `xcodegen` project. `Signing.xcconfig` builds ad-hoc signed
   with no team.
 

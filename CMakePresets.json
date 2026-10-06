@@ -1,0 +1,63 @@
+{
+  "version": 6,
+  "configurePresets": [
+    {
+      "name": "base",
+      "hidden": true,
+      "generator": "Ninja",
+      "binaryDir": "${sourceDir}/build/${presetName}",
+      "cacheVariables": {
+        "CMAKE_C_COMPILER": "/opt/homebrew/opt/llvm/bin/clang",
+        "CMAKE_PREFIX_PATH": "/opt/homebrew"
+      }
+    },
+    {
+      "name": "dev",
+      "inherits": "base",
+      "cacheVariables": {
+        "CMAKE_C_CLANG_TIDY": "/opt/homebrew/opt/llvm/bin/clang-tidy;--quiet",
+        "CMAKE_C_CPPCHECK": "cppcheck;--std=c11;--language=c;--enable=warning,performance,portability,style;--inline-suppr;--suppressions-list=${sourceDir}/CTask4PDF/cppcheck-suppressions.txt;--error-exitcode=2;--quiet"
+      }
+    },
+    {
+      "name": "coverage",
+      "inherits": "base",
+      "cacheVariables": {
+        "NULLMARK_COVERAGE": "ON"
+      }
+    }
+  ],
+  "buildPresets": [
+    { "name": "dev", "configurePreset": "dev" },
+    { "name": "coverage", "configurePreset": "coverage" }
+  ],
+  "testPresets": [
+    {
+      "name": "pytest",
+      "configurePreset": "dev",
+      "output": { "outputOnFailure": true, "verbosity": "verbose" },
+      "filter": { "include": { "name": "^pytest$" } }
+    },
+    {
+      "name": "fuzz",
+      "configurePreset": "dev",
+      "output": { "outputOnFailure": true },
+      "filter": { "include": { "name": "^fuzz$" } }
+    },
+    {
+      "name": "coverage",
+      "configurePreset": "coverage",
+      "output": { "outputOnFailure": true }
+    }
+  ],
+  "workflowPresets": [
+    {
+      "name": "coverage",
+      "steps": [
+        { "type": "configure", "name": "coverage" },
+        { "type": "build", "name": "coverage" },
+        { "type": "test", "name": "coverage" }
+      ]
+    }
+  ]
+}
