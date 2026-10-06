@@ -6,6 +6,7 @@ export PATH := "/opt/homebrew/opt/llvm/bin:" + env("PATH")
 
 c_sources := "CTask4PDF/*.c CTask4PDF/*/*.[ch] AppTests/Support/*.c App/*.h"
 
+[parallel]
 check: fmt-check lint typecheck test xctest fuzz coverage actions secrets reuse
 
 ci-check: install check
@@ -29,7 +30,11 @@ lint: build
     swiftlint lint --strict
     ruff check tests
 
-build:
+[working-directory('mupdf')]
+mupdf:
+    cmake --workflow --preset mupdf
+
+build: mupdf
     cmake --preset dev
     cmake --build --preset dev
 
@@ -39,11 +44,11 @@ typecheck:
 test: build
     ctest --preset pytest
 
-app: build
+app: mupdf
     xcodegen generate
     xcodebuild build -project Nullmark.xcodeproj -scheme Nullmark -configuration Release -derivedDataPath build/app
 
-dist: build
+dist: mupdf
     #!/usr/bin/env bash
     set -euo pipefail
     xcodegen generate
@@ -63,14 +68,14 @@ dist: build
     ditto -c -k --keepParent "$app" "build/dist/Nullmark-$version.zip"
     (cd build/dist && shasum -a 256 "Nullmark-$version.zip" > SHA256SUMS)
 
-xctest: build
+xctest: mupdf
     xcodegen generate
     xcodebuild test -project Nullmark.xcodeproj -scheme Nullmark CODE_SIGNING_ALLOWED=NO
 
 fuzz: build
     ctest --preset fuzz
 
-coverage:
+coverage: mupdf
     cmake --workflow --preset coverage
     gcovr build/coverage
 

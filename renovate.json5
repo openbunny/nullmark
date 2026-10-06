@@ -4,7 +4,7 @@
   customManagers: [
     {
       customType: "regex",
-      managerFilePatterns: ["/^CMakeLists\\.txt$/"],
+      managerFilePatterns: ["/^mupdf/CMakeLists\\.txt$/"],
       matchStrings: ["set\\(MUPDF_VERSION (?<currentValue>\\d+\\.\\d+\\.\\d+)\\)"],
       datasourceTemplate: "github-tags",
       depNameTemplate: "ArtifexSoftware/mupdf",

@@ -69,7 +69,7 @@ the Nullmark message, and confirm. Later launches open normally.
 
 ### Build from source
 
-The build downloads the MuPDF source release that `CMakeLists.txt` pins by URL
+The build downloads the MuPDF source release that `mupdf/CMakeLists.txt` pins by URL
 and SHA-256, builds it, and links it statically, so the app loads no MuPDF
 library at runtime. The first build needs network access to `mupdf.com`. The
 app is ad-hoc signed (`Signing.xcconfig`).
@@ -93,12 +93,12 @@ open build/app/Build/Products/Release/Nullmark.app
 
 `just install` installs the toolchain pinned in `mise.toml`, the Python
 environment from `tests/uv.lock` and the git hooks from `lefthook.yml`.
-`just app` builds MuPDF and the core through the `dev` CMake preset, generates
-`Nullmark.xcodeproj` from `project.yml` with `xcodegen`, and builds a Release
-app. `just dist` builds the release assets into `build/dist` and fails if the
-app links a library outside `/usr/lib` and `/System`, fails
-`codesign --verify --strict`, or carries the `get-task-allow` entitlement.
-`just --list` prints every recipe.
+`just app` builds MuPDF once into `build/mupdf` through `mupdf/CMakeLists.txt`,
+generates `Nullmark.xcodeproj` from `project.yml` with `xcodegen`, and builds a
+Release app. `just dist` builds the release assets into `build/dist` and fails
+if the app links a library outside `/usr/lib` and `/System`, fails
+`codesign --verify --strict`, carries the `get-task-allow` entitlement, or is
+built for anything but arm64. `just --list` prints every recipe.
 
 ## Use
 
@@ -188,7 +188,8 @@ just install
 just check
 ```
 
-`just check` runs every gate and stops at the first failure. `just ci-check`
+`just check` runs the gates in parallel, waits for all of them, and exits
+non-zero if any failed. `just ci-check`
 runs `just install`, then the gates; the CI workflow runs it. See
 [CONTRIBUTING.md](CONTRIBUTING.md) for the commit and review rules and
 [tests/README.md](tests/README.md) for the test suite.

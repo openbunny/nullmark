@@ -11,7 +11,7 @@ copyright 2020 The JetBrains Mono Project Authors
 package's resource bundle inside the app.
 
 The app binary and the CLI link MuPDF statically, from the source release
-`CMakeLists.txt` pins. MuPDF is licensed under the AGPL; see README.md for the
+`mupdf/CMakeLists.txt` pins. MuPDF is licensed under the AGPL; see README.md for the
 conditions that apply to distributing a build linked against it. The MuPDF
 build compiles these libraries into the same binary, each under its own
 licence, whose text is in `thirdparty/<name>/` of that source release:

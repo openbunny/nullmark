@@ -30,9 +30,9 @@ settings:
     ENABLE_HARDENED_RUNTIME: 'YES'
     HEADER_SEARCH_PATHS:
       - '$(PROJECT_DIR)/CTask4PDF/include'
-      - '$(PROJECT_DIR)/build/dev/mupdf/include'
+      - '$(PROJECT_DIR)/build/mupdf/include'
     LIBRARY_SEARCH_PATHS:
-      - '$(PROJECT_DIR)/build/dev/mupdf/lib'
+      - '$(PROJECT_DIR)/build/mupdf/lib'
     OTHER_LDFLAGS:
       - '-lmupdf'
       - '-lmupdf-third'
@@ -45,7 +45,7 @@ targets:
       - path: 'CTask4PDF/task4pdf.c'
       - path: 'App/Assets.xcassets'
       - path: 'App/Assets/AppIcon.icon'
-      - path: 'build/dev/mupdf/licenses'
+      - path: 'build/mupdf/licenses'
         type: 'folder'
         buildPhase: 'resources'
     dependencies:

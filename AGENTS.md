@@ -9,8 +9,10 @@ guarantee the core makes (`tests/`). The generated Xcode project comes from
 
 ## Gates
 
-`just check` runs every gate and stops at the first failure. `just --list`
-prints the recipes. `just install` installs the pinned toolchain from
+`just check` runs the gates in parallel, waits for all of them, and exits
+non-zero if any failed, so one run reports every failure. A gate that needs a
+build depends on the recipe that makes it, and `just` runs that recipe once per
+invocation. `just --list` prints the recipes. `just install` installs the pinned toolchain from
 `mise.toml`, the Python environment from `tests/uv.lock` and the git hooks
 from `lefthook.yml`; `just ci-check` runs it, then the gates. Xcode, and
 LLVM and cppcheck under `/opt/homebrew`, come from the machine.
@@ -53,10 +55,11 @@ caller must treat as one.
 
 ## MuPDF
 
-MuPDF parses attacker-supplied PDF input. `CMakeLists.txt` pins its source
-release by `MUPDF_VERSION` and SHA-256 and builds it as static libraries,
-`libmupdf.a` and `libmupdf-third.a`, under `build/<preset>/mupdf`; every CMake
-target and the Xcode project link that one build. An upgrade changes the
+MuPDF parses attacker-supplied PDF input. `mupdf/CMakeLists.txt` pins its
+source release by `MUPDF_VERSION` and SHA-256 and builds it as static libraries,
+`libmupdf.a` and `libmupdf-third.a`, once per checkout under `build/mupdf` (`just
+mupdf`); every CMake preset of the root project and the Xcode project link that
+one build. An upgrade changes the
 version and the hash together and is reviewed for its security fixes first.
 Renovate proposes the version from the `ArtifexSoftware/mupdf` tags but cannot
 compute the hash, so its pull request fails at download with a hash mismatch
@@ -83,7 +86,8 @@ system and the bundle fails library validation under the hardened runtime.
   together over the seed corpus. A reproducer libFuzzer writes under
   `CTask4PDF/fuzz/` joins the corpus once its fix lands.
 - `CMakeLists.txt` builds the CLI, the fuzz target and the coverage runner;
-  `CMakePresets.json` holds the configurations. The `dev` preset runs
+  `CMakePresets.json` holds the configurations; `mupdf/` holds the MuPDF build
+  and its own preset. The `dev` preset runs
   `clang-tidy` and `cppcheck` on every C file a CMake target compiles, so a C
   file outside every target is unlinted. `cppcheck` carries its own suppressions
   list. Build and test steps are CMake and CTest configuration, not shell

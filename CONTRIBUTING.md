@@ -17,11 +17,11 @@ How to build, test, and submit a change to `nullmark`.
 
 - Install the toolchain and the git hooks once per clone: `just install`.
   `mise.toml` pins the tools. Xcode, and LLVM and cppcheck under
-  `/opt/homebrew`, come from the machine; `CMakeLists.txt` pins MuPDF; the header of the `justfile` lists
+  `/opt/homebrew`, come from the machine; `mupdf/CMakeLists.txt` pins MuPDF; the header of the `justfile` lists
   them.
 - `lefthook.yml` runs `fmt-check`, `lint`, `typecheck` and `secrets` before each
   commit and `just check` before each push.
-- Run `just check` before opening a pull request. It stops at the first failure.
+- Run `just check` before opening a pull request. It runs the gates in parallel and reports every failure.
   `just --list` prints the gates; the `justfile` owns the set. The CI workflow
   runs `just ci-check`, which runs `just install` and then the gates.
 - Every change ships tests for the behaviour it adds or fixes, using local

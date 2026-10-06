@@ -26,6 +26,8 @@ it refuses.
 - `CMakeLists.txt` and `CMakePresets.json`: the C build of the CLI, the fuzz
   target and the coverage runner, and the CTest entries for pytest and the
   fuzzer. `gcovr.cfg` configures the coverage report.
+- `mupdf/`: the standalone CMake project and preset that build MuPDF once into
+  `build/mupdf`. See [MuPDF dependency](#mupdf-dependency).
 - `project.yml`: the `xcodegen` project. `Signing.xcconfig` builds ad-hoc signed
   with no team.
 
@@ -80,10 +82,15 @@ The byte-identity claims and their limits are in
 
 ## MuPDF dependency
 
-`CMakeLists.txt` downloads the MuPDF source release it pins by URL and SHA-256
-and builds `libmupdf.a` and `libmupdf-third.a` with MuPDF's own Makefile.
-`project.yml` links both from `build/dev/mupdf`, so the app, the CLI, the test
-suite and the fuzz target run the same MuPDF. LLVM (clang-format, clang-tidy,
+`mupdf/CMakeLists.txt` is a standalone CMake project with no language enabled.
+It downloads the MuPDF source release it pins by URL and SHA-256 and builds
+`libmupdf.a` and `libmupdf-third.a` with MuPDF's own Makefile on every logical
+core, installing them with the headers and licence texts under `build/mupdf`.
+`just mupdf` builds it; every recipe that links MuPDF depends on that recipe, so
+a checkout builds MuPDF once. The root `CMakeLists.txt` and
+`project.yml` link `build/mupdf`; the root project fails at configure time when
+it is missing. So the app, the CLI, the test suite and the fuzz target run
+the same MuPDF. LLVM (clang-format, clang-tidy,
 LeakSanitizer, libFuzzer, llvm-cov) and cppcheck are workstation prerequisites
 outside `mise.toml`; the `justfile` header lists them. The AGPL terms for distributing a linked build are in
 [README.md](../README.md#license). The sandbox and hardened-runtime entitlements
