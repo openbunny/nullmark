@@ -91,7 +91,7 @@ struct ContentView: View {
   private var replaceCard: some View {
     Card(title: "Replace", symbol: "arrow.left.arrow.right") {
       LabeledField(
-        label: "Find", placeholder: "Text currently in the PDF", text: $model.findText)
+        label: "Find", placeholder: "Text in the PDF", text: $model.findText)
       LabeledField(label: "Replace with", placeholder: "New text", text: $model.replaceText)
       Button(action: model.apply) {
         Label("Apply Replacement", systemImage: "wand.and.stars")

@@ -3,6 +3,8 @@ import Observation
 import PDFKit
 import UniformTypeIdentifiers
 
+private let scratchDirectoryPermissions = 0o700
+
 @MainActor
 @Observable
 final class EditorModel {
@@ -95,7 +97,7 @@ final class EditorModel {
     try FileManager.default.createDirectory(
       at: directory,
       withIntermediateDirectories: false,
-      attributes: [.posixPermissions: 0o700])
+      attributes: [.posixPermissions: scratchDirectoryPermissions])
     let outcome: Result<T, Error>
     do {
       outcome = .success(try body(directory))
