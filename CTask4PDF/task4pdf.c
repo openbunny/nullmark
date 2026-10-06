@@ -44,6 +44,8 @@ enum {
     HEX_NIBBLE_MASK = 0xF,
 };
 static const float CHANNEL_MAX = 255.0f;
+static const unsigned char kShowTextOp[TEXT_OP_LEN] = {'T', 'j'};
+static const unsigned char kShowTextArrayOp[TEXT_OP_LEN] = {'T', 'J'};
 
 // remove()'s result is not checked: every caller is already reporting a failure
 // through the return code or a non-zero out->residual, and no recovery exists.
@@ -856,24 +858,29 @@ static void add_unique_codepoint(int *set, int *n, int max, int cp) {
     (*n)++;
 }
 
-// Reads beginbfchar destinations as UTF-16BE (ISO 32000-1 section 9.10.3,
-// https://opensource.adobe.com/dc-acrobat-sdk-docs/pdfstandards/PDF32000_2008.pdf).
-// bfrange blocks are not parsed, so a target mapped only through one is not
-// caught here.
-static int cmap_bfchar_codepoints(const char *s, size_t len, int *out, int max) {
-    int n = 0;
+static const char kBfcharBegin[] = "beginbfchar";
+static const char kBfcharEnd[] = "endbfchar";
+
+typedef void (*bfchar_entry_fn)(void *arg, const unsigned char *src, size_t srclen,
+                                const unsigned char *dst, size_t dstlen);
+
+// Calls fn for each <src> <dst> pair inside every beginbfchar ... endbfchar
+// block. Lengths are as parse_hex_literal reports them and may exceed the
+// buffer sizes, so fn applies its own bounds. A block with no endbfchar ends
+// the walk.
+static void for_each_bfchar(const char *s, size_t len, bfchar_entry_fn fn, void *arg) {
+    const size_t begin_len = sizeof(kBfcharBegin) - 1;
+    const size_t end_len = sizeof(kBfcharEnd) - 1;
     size_t i = 0;
-    static const char kBegin[] = "beginbfchar";
-    static const char kEnd[] = "endbfchar";
     while (i < len) {
-        if (i + sizeof(kBegin) - 1 > len || memcmp(s + i, kBegin, sizeof(kBegin) - 1) != 0) {
+        if (i + begin_len > len || memcmp(s + i, kBfcharBegin, begin_len) != 0) {
             i++;
             continue;
         }
-        size_t stop = i + sizeof(kBegin) - 1;
+        size_t stop = i + begin_len;
         int found_end = 0;
         while (stop < len) {
-            if (stop + sizeof(kEnd) - 1 <= len && memcmp(s + stop, kEnd, sizeof(kEnd) - 1) == 0) {
+            if (stop + end_len <= len && memcmp(s + stop, kBfcharEnd, end_len) == 0) {
                 found_end = 1;
                 break;
             }
@@ -882,7 +889,7 @@ static int cmap_bfchar_codepoints(const char *s, size_t len, int *out, int max) 
         if (!found_end) {
             break;
         }
-        size_t q = i + sizeof(kBegin) - 1;
+        size_t q = i + begin_len;
         while (q < stop) {
             unsigned char srcbuf[MAX_NEEDLE];
             size_t srclen = parse_hex_literal(s, stop, &q, srcbuf, sizeof srcbuf);
@@ -891,19 +898,42 @@ static int cmap_bfchar_codepoints(const char *s, size_t len, int *out, int max) 
             }
             unsigned char dstbuf[MAX_NEEDLE * UTF16_UNIT_BYTES];
             size_t dstlen = parse_hex_literal(s, stop, &q, dstbuf, sizeof dstbuf);
-            if (dstlen == 0) {
-                continue;
-            }
-            int cps[MAX_NEEDLE];
-            size_t capped = dstlen < sizeof dstbuf ? dstlen : sizeof dstbuf;
-            int cn = decode_utf16be_bytes(dstbuf, capped, cps, MAX_NEEDLE);
-            for (int k = 0; k < cn && k < MAX_NEEDLE; k++) {
-                add_unique_codepoint(out, &n, max, cps[k]);
-            }
+            fn(arg, srcbuf, srclen, dstbuf, dstlen);
         }
-        i = stop + sizeof(kEnd) - 1;
+        i = stop + end_len;
     }
-    return n;
+}
+
+typedef struct {
+    int *out;
+    int max;
+    int n;
+} CodepointSet;
+
+static void collect_bfchar_codepoints(void *arg, const unsigned char *src, size_t srclen,
+                                      const unsigned char *dst, size_t dstlen) {
+    (void)src;
+    (void)srclen;
+    CodepointSet *set = arg;
+    if (dstlen == 0) {
+        return;
+    }
+    int cps[MAX_NEEDLE];
+    size_t cap = (size_t)MAX_NEEDLE * UTF16_UNIT_BYTES;
+    int cn = decode_utf16be_bytes(dst, dstlen < cap ? dstlen : cap, cps, MAX_NEEDLE);
+    for (int k = 0; k < cn && k < MAX_NEEDLE; k++) {
+        add_unique_codepoint(set->out, &set->n, set->max, cps[k]);
+    }
+}
+
+// Reads beginbfchar destinations as UTF-16BE (ISO 32000-1 section 9.10.3,
+// https://opensource.adobe.com/dc-acrobat-sdk-docs/pdfstandards/PDF32000_2008.pdf).
+// bfrange blocks are not parsed, so a target mapped only through one is not
+// caught here.
+static int cmap_bfchar_codepoints(const char *s, size_t len, int *out, int max) {
+    CodepointSet set = {out, max, 0};
+    for_each_bfchar(s, len, collect_bfchar_codepoints, &set);
+    return set.n;
 }
 
 // True when the bfchar destinations are exactly the target's distinct
@@ -965,6 +995,46 @@ static void append_hex_literal(fz_context *ctx, fz_buffer *out, const unsigned c
     fz_append_byte(ctx, out, '>');
 }
 
+typedef struct {
+    fz_context *ctx;
+    fz_buffer *entries;
+    const int *keep;
+    int keep_n;
+    int kept;
+} BfcharFilter;
+
+static void keep_bfchar_entry(void *arg, const unsigned char *src, size_t srclen,
+                              const unsigned char *dst, size_t dstlen) {
+    BfcharFilter *f = arg;
+    if (srclen == 0 || srclen > MAX_NEEDLE || dstlen == 0 ||
+        dstlen > (size_t)MAX_NEEDLE * UTF16_UNIT_BYTES) {
+        return;
+    }
+    int cps[MAX_NEEDLE];
+    int cn = decode_utf16be_bytes(dst, dstlen, cps, MAX_NEEDLE);
+    if (cn <= 0 || cn > MAX_NEEDLE) {
+        return;
+    }
+    for (int k = 0; k < cn; k++) {
+        if (!codepoint_in_set(cps[k], f->keep, f->keep_n)) {
+            return;
+        }
+    }
+    append_hex_literal(f->ctx, f->entries, src, srclen);
+    fz_append_byte(f->ctx, f->entries, ' ');
+    append_hex_literal(f->ctx, f->entries, dst, dstlen);
+    fz_append_byte(f->ctx, f->entries, '\n');
+    f->kept++;
+}
+
+static const char kCMapPreamble[] =
+    "/CIDInit /ProcSet findresource begin\n12 dict begin\nbegincmap\n"
+    "/CIDSystemInfo << /Registry (Adobe) /Ordering (UCS) /Supplement 0 >> "
+    "def\n/CMapName /Task4-UCS def\n/CMapType 2 def\n"
+    "1 begincodespacerange\n<0000> <FFFF>\nendcodespacerange\n";
+static const char kCMapEpilogue[] =
+    "endbfchar\nendcmap\nCMapName currentdict /CMap defineresource pop\nend\nend\n";
+
 // Keeps only the bfchar entries whose destination lies entirely in `keep`, the
 // replacement's codepoints. Returns a buffer the caller drops, or NULL when no
 // entry is kept. bfrange entries are not carried over: cmap_reveals_target
@@ -972,85 +1042,26 @@ static void append_hex_literal(fz_context *ctx, fz_buffer *out, const unsigned c
 // through bfchar.
 static fz_buffer *filter_tounicode(fz_context *ctx, const char *s, size_t len, const int *keep,
                                    int keep_n) {
-    fz_buffer *entries = fz_new_buffer(ctx, len);
-    int kept = 0;
-    fz_try(ctx) {
-        size_t i = 0;
-        static const char kBegin[] = "beginbfchar";
-        static const char kEnd[] = "endbfchar";
-        while (i < len) {
-            if (i + sizeof(kBegin) - 1 > len || memcmp(s + i, kBegin, sizeof(kBegin) - 1) != 0) {
-                i++;
-                continue;
-            }
-            size_t stop = i + sizeof(kBegin) - 1;
-            int found_end = 0;
-            while (stop < len) {
-                if (stop + sizeof(kEnd) - 1 <= len &&
-                    memcmp(s + stop, kEnd, sizeof(kEnd) - 1) == 0) {
-                    found_end = 1;
-                    break;
-                }
-                stop++;
-            }
-            if (!found_end) {
-                break;
-            }
-            size_t q = i + sizeof(kBegin) - 1;
-            while (q < stop) {
-                unsigned char srcbuf[MAX_NEEDLE];
-                size_t srclen = parse_hex_literal(s, stop, &q, srcbuf, sizeof srcbuf);
-                if (srclen == 0 && q >= stop) {
-                    break;
-                }
-                unsigned char dstbuf[MAX_NEEDLE * UTF16_UNIT_BYTES];
-                size_t dstlen = parse_hex_literal(s, stop, &q, dstbuf, sizeof dstbuf);
-                if (srclen == 0 || srclen > sizeof srcbuf || dstlen == 0 ||
-                    dstlen > sizeof dstbuf) {
-                    continue;
-                }
-                int cps[MAX_NEEDLE];
-                int cn = decode_utf16be_bytes(dstbuf, dstlen, cps, MAX_NEEDLE);
-                int all_kept = cn > 0 && cn <= MAX_NEEDLE;
-                for (int k = 0; k < cn && k < MAX_NEEDLE; k++) {
-                    if (!codepoint_in_set(cps[k], keep, keep_n)) {
-                        all_kept = 0;
-                        break;
-                    }
-                }
-                if (all_kept) {
-                    append_hex_literal(ctx, entries, srcbuf, srclen);
-                    fz_append_byte(ctx, entries, ' ');
-                    append_hex_literal(ctx, entries, dstbuf, dstlen);
-                    fz_append_byte(ctx, entries, '\n');
-                    kept++;
-                }
-            }
-            i = stop + sizeof(kEnd) - 1;
-        }
-    }
+    BfcharFilter filter = {ctx, fz_new_buffer(ctx, len), keep, keep_n, 0};
+    fz_buffer *entries = filter.entries;
+    fz_try(ctx) { for_each_bfchar(s, len, keep_bfchar_entry, &filter); }
     fz_catch(ctx) {
         fz_drop_buffer(ctx, entries);
         fz_rethrow(ctx);
     }
+    int kept = filter.kept;
     if (kept == 0) {
         fz_drop_buffer(ctx, entries);
         return NULL;
     }
     fz_buffer *out = fz_new_buffer(ctx, len);
     fz_try(ctx) {
-        fz_append_string(ctx, out,
-                         "/CIDInit /ProcSet findresource begin\n12 dict begin\nbegincmap\n"
-                         "/CIDSystemInfo << /Registry (Adobe) /Ordering (UCS) /Supplement 0 >> "
-                         "def\n/CMapName /Task4-UCS def\n/CMapType 2 def\n"
-                         "1 begincodespacerange\n<0000> <FFFF>\nendcodespacerange\n");
-        fz_append_printf(ctx, out, "%d beginbfchar\n", kept);
+        fz_append_string(ctx, out, kCMapPreamble);
+        fz_append_printf(ctx, out, "%d %s\n", kept, kBfcharBegin);
         unsigned char *edata = NULL;
         size_t elen = fz_buffer_storage(ctx, entries, &edata);
         fz_append_data(ctx, out, edata, elen);
-        fz_append_string(ctx, out,
-                         "endbfchar\nendcmap\nCMapName currentdict /CMap defineresource pop\nend\n"
-                         "end\n");
+        fz_append_string(ctx, out, kCMapEpilogue);
     }
     fz_always(ctx) { fz_drop_buffer(ctx, entries); }
     fz_catch(ctx) {
@@ -1159,8 +1170,8 @@ static int ap_stream_is_unverifiable(fz_context *ctx, pdf_obj *stream_obj) {
         buf = pdf_load_stream(ctx, stream_obj);
         unsigned char *data = NULL;
         size_t len = fz_buffer_storage(ctx, buf, &data);
-        shows_text = count_needle_bytes(data, len, (const unsigned char *)"Tj", TEXT_OP_LEN) > 0 ||
-                     count_needle_bytes(data, len, (const unsigned char *)"TJ", TEXT_OP_LEN) > 0;
+        shows_text = count_needle_bytes(data, len, kShowTextOp, TEXT_OP_LEN) > 0 ||
+                     count_needle_bytes(data, len, kShowTextArrayOp, TEXT_OP_LEN) > 0;
     }
     fz_always(ctx) { fz_drop_buffer(ctx, buf); }
     fz_catch(ctx) { fz_rethrow(ctx); }
