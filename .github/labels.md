@@ -3,8 +3,8 @@
 # Label taxonomy
 
 Three prefixes: `type/*` classifies an issue, `area/*` locates it, `status/*`
-tracks it through triage. Every issue and PR carries exactly one `type/*`
-label; `area/*` and `status/*` are added during triage.
+tracks it through triage. Every issue and PR carries exactly one `type/*` label;
+`area/*` and `status/*` are added during triage.
 
 ## type/*
 
