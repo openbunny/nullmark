@@ -50,12 +50,29 @@ The app does not perform OCR.
 
 ## Install
 
-The project is published as source only: no build of the app is distributed,
-signed or notarized; it is built from a clone. The build downloads the MuPDF
-source release that `CMakeLists.txt` pins by URL and SHA-256, builds it, and
-links it statically, so the app loads no MuPDF library at runtime. The first
-build needs network access to `mupdf.com`. The app is ad-hoc signed
-(`Signing.xcconfig`).
+Each [release](https://github.com/openbunny/nullmark/releases) attaches
+`Nullmark-X.Y.Z.zip`, an ad-hoc signed app, and `SHA256SUMS`, with a build
+provenance attestation for both files. The app is not notarized: no Developer ID
+certificate signs it, so Gatekeeper blocks the first launch. The app requires
+macOS 27 or later on Apple silicon.
+
+Verify a download from the directory that holds both files:
+
+```sh
+gh attestation verify Nullmark-X.Y.Z.zip -R openbunny/nullmark
+shasum -a 256 -c SHA256SUMS
+```
+
+Unzip and move `Nullmark.app` to `/Applications`. Open it once; macOS refuses.
+Open **System Settings > Privacy & Security**, choose **Open Anyway** next to
+the Nullmark message, and confirm. Later launches open normally.
+
+### Build from source
+
+The build downloads the MuPDF source release that `CMakeLists.txt` pins by URL
+and SHA-256, builds it, and links it statically, so the app loads no MuPDF
+library at runtime. The first build needs network access to `mupdf.com`. The
+app is ad-hoc signed (`Signing.xcconfig`).
 
 Requirements:
 
@@ -78,7 +95,10 @@ open build/app/Build/Products/Release/Nullmark.app
 environment from `tests/uv.lock` and the git hooks from `lefthook.yml`.
 `just app` builds MuPDF and the core through the `dev` CMake preset, generates
 `Nullmark.xcodeproj` from `project.yml` with `xcodegen`, and builds a Release
-app. `just --list` prints every recipe.
+app. `just dist` builds the release assets into `build/dist` and fails if the
+app links a library outside `/usr/lib` and `/System`, fails
+`codesign --verify --strict`, or carries the `get-task-allow` entitlement.
+`just --list` prints every recipe.
 
 ## Use
 

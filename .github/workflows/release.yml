@@ -1,0 +1,44 @@
+name: Release
+on:
+  push:
+    tags: ['v*.*.*']
+permissions: {}
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  release:
+    name: Release
+    permissions:
+      contents: write # create the release and upload its assets
+      id-token: write # sign the provenance attestation
+      attestations: write # store the provenance attestation
+    runs-on: xcode-27
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: select Xcode
+        run: sudo xcode-select --switch /Applications/Xcode_27.0.app
+      - uses: jdx/mise-action@7a4e45a543138629540c9a1616d08632b893e492 # v5.0.1
+        with:
+          cache: false
+      - name: install Homebrew prerequisites
+        run: brew install llvm cppcheck
+      - name: dist
+        run: just dist
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: |
+            build/dist/Nullmark-*.zip
+            build/dist/SHA256SUMS
+      - name: upload to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          test -f "build/dist/Nullmark-${TAG#v}.zip"
+          gh release view "$TAG" > /dev/null 2>&1 || gh release create "$TAG" --verify-tag --generate-notes --title "$TAG"
+          gh release upload "$TAG" build/dist/Nullmark-*.zip build/dist/SHA256SUMS --clobber

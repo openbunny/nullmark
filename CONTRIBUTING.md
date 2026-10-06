@@ -45,14 +45,18 @@ How to build, test, and submit a change to `nullmark`.
 
 ## Releases
 
-A release is source only: a `vX.Y.Z` tag on `main` and a GitHub release whose
-notes list the changes since the previous tag. No build of the app is attached.
+A release is a `vX.Y.Z` tag on `main`. CI builds the app with `just dist` and
+attaches `Nullmark-X.Y.Z.zip` and `SHA256SUMS`, both with a build provenance
+attestation, to the GitHub release for the tag. The release notes list the
+changes since the previous tag.
 
 1. Set `MARKETING_VERSION` in `project.yml` to `X.Y.Z` and raise
    `CURRENT_PROJECT_VERSION` by one, in a `chore: release X.Y.Z` commit.
 2. Run `just check`.
-3. Create the release with `gh release create vX.Y.Z --target main
-   --generate-notes`.
+3. Push the tag `vX.Y.Z` on that commit to `origin`.
+4. `.github/workflows/release.yml` builds, attests and uploads the assets, and
+   creates the release with generated notes if none exists for the tag. The
+   workflow fails if the tag version differs from `MARKETING_VERSION`.
 
 ## Developer Certificate of Origin
 

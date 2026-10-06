@@ -43,6 +43,23 @@ app: build
     xcodegen generate
     xcodebuild build -project Nullmark.xcodeproj -scheme Nullmark -configuration Release -derivedDataPath build/app
 
+dist: build
+    #!/usr/bin/env bash
+    set -euo pipefail
+    xcodegen generate
+    xcodebuild clean build -project Nullmark.xcodeproj -scheme Nullmark -configuration Release -derivedDataPath build/dist-derived
+    app=build/dist-derived/Build/Products/Release/Nullmark.app
+    version=$(xcodebuild -project Nullmark.xcodeproj -target Nullmark -configuration Release -showBuildSettings | awk '$1 == "MARKETING_VERSION" { print $3; exit }')
+    test -n "$version"
+    codesign --verify --strict "$app"
+    if codesign -d --entitlements - "$app" 2>&1 | grep -q get-task-allow; then echo "$app carries get-task-allow" >&2; exit 1; fi
+    foreign=$(otool -L "$app/Contents/MacOS/Nullmark" | tail -n +2 | awk '{ print $1 }' | grep -vE '^(/usr/lib/|/System/)' || true)
+    if test -n "$foreign"; then echo "$app links outside /usr/lib and /System:" >&2; echo "$foreign" >&2; exit 1; fi
+    rm -rf build/dist
+    mkdir -p build/dist
+    ditto -c -k --keepParent "$app" "build/dist/Nullmark-$version.zip"
+    (cd build/dist && shasum -a 256 "Nullmark-$version.zip" > SHA256SUMS)
+
 xctest: build
     xcodegen generate
     xcodebuild test -project Nullmark.xcodeproj -scheme Nullmark CODE_SIGNING_ALLOWED=NO
