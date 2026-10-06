@@ -61,8 +61,8 @@ version and the hash together and is reviewed for its security fixes first.
 Renovate proposes the version from the `ArtifexSoftware/mupdf` tags but cannot
 compute the hash, so its pull request fails at download with a hash mismatch
 until a reviewer updates `URL_HASH`; that failure is intended and is not worked
-around. MuPDF is AGPL; README.md
-states what distributing a linked build requires.
+around. MuPDF is AGPL; README.md states what distributing a linked build
+requires.
 
 The Makefile flags in `MUPDF_MAKE_ARGS` keep OpenSSL, X11 and GLUT off the link
 line. Do not remove one without confirming `otool -L` on the app still lists no

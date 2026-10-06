@@ -26,9 +26,11 @@ other outcome, or corrupts memory while parsing a PDF.
 
 Not a vulnerability: text drawn as an image, which has no text layer and is out
 of scope, and the byte-level differences between input and output that
-[README.md](README.md#what-preservation-means-at-the-byte-level) states. The app
-runs without App Sandbox and the hardened runtime; the reason is in
-[README.md](README.md#sandbox-and-hardened-runtime).
+[README.md](README.md#what-preservation-means-at-the-byte-level) states.
+
+The app runs under App Sandbox and the hardened runtime;
+[README.md](README.md#sandbox-and-hardened-runtime) lists its entitlements. A
+read or write outside them is a vulnerability.
 
 ## Network behaviour
 
