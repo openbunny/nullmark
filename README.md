@@ -41,9 +41,10 @@ packet, outline (bookmark) titles, annotation text and form-field values.
 scrubbed surface and the string encodings covered.
 
 The app calls the C core directly. `PDFEngine` is the only code that calls
-`t4_replace`, and `EditorModel.apply()` calls `PDFEngine.replace`. `PDFMetadata`
-is not on that path: `EditorModel.load()` builds it from the opened document as
-a read-only summary for display.
+`t4_replace`, and `EditorModel.apply()` reaches `PDFEngine.replace` through the
+private `EditorModel.replace`. `PDFMetadata` is not on that path:
+`EditorModel.load()` builds it from the opened document as a read-only summary
+for display.
 
 Text drawn as an image, such as a scan, has no text layer and is out of scope.
 The app does not perform OCR.
@@ -91,7 +92,8 @@ Requirements:
   runs clang from the Apple-silicon Homebrew prefix `/opt/homebrew`).
 - Xcode 27 (`.xcode-version`).
 - Homebrew: `brew install mise llvm cppcheck`. The `dev` CMake preset that
-  builds MuPDF and the core runs clang-tidy and cppcheck.
+  builds the core runs clang-tidy and cppcheck. MuPDF builds through the
+  `mupdf` preset (`just mupdf`).
 
 Build and run:
 
@@ -112,20 +114,24 @@ built for anything but arm64. `just --list` prints every recipe.
 
 ## Use
 
-1. Drop a PDF on the window, or choose **choose pdf…**. The app captures the
-   document's metadata before any change.
+1. Drop a PDF on the window, or choose **drop a pdf or click to choose** in the
+   sidebar or **select** in the preview pane. The app captures the document's
+   metadata before any change.
 2. Enter the text to find and its replacement, then choose **apply
    replacement** (⌘↩). Matching is case-sensitive.
 3. The status line reports the outcome. A success means the independent scan of
    the output found no remaining occurrence on any text surface. A failure
    leaves the document unchanged. Text in a scan is neither found nor changed.
 4. Choose **export pdf…** (⌘S) to write the edited copy to a new file. The
-   original file is not modified. The export restores the creation and
-   modification dates, permissions and extended attributes. When every one
-   matches the original, the app clears the document, its metadata, the find
-   and replace fields and the status line, and returns to the drop screen.
-   When any differs, the app keeps the document open and the status line names
-   each one.
+   original file is not modified. The export restores the creation,
+   modification and access dates, permissions, the hidden-extension flag and
+   extended attributes other than `com.apple.quarantine`,
+   `com.apple.provenance` and `com.apple.macl`. When every compared item
+   matches the original, the app clears the document, its metadata, the file
+   path, the find and replace fields and the status line, and returns to the
+   drop screen, which reads "drop or select a pdf to play again". When any
+   differs, the app keeps the document open and the status line names each
+   one.
 
 ## Security
 

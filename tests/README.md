@@ -82,8 +82,8 @@ Three fixtures place the target in the page text:
 
 `hidden_cid_annot.pdf` places the target only in a Hidden annotation's
 appearance stream, drawn through a CID font with no `/ToUnicode`. Neither
-`fz_stext` (blind to Hidden layers) nor a Unicode-driven reader can recover this
-text, so it must fail closed rather than ship intact. It is subset from the
+`fz_stext` (which skips Hidden layers) nor a Unicode-driven reader can recover
+this text, so it must fail closed rather than ship intact. It is subset from the
 system TrueType font `generate.SYSTEM_TTF` names, and its test is skipped when
 that font is missing or lacks the target's glyphs.
 
@@ -218,7 +218,8 @@ with Hypothesis-generated fixtures, read the same way through `pikepdf`:
   of the residual count.
 - `test_scrub_removes_astral_target` runs the XMP and Info surfaces with a
   target containing a non-BMP codepoint, to exercise the surrogate-pair branch
-  of `encode_utf16be`. Every other test's target is pure ASCII or BMP.
+  of `encode_utf16be` deterministically. The other hand-picked tests use ASCII
+  or BMP targets.
 - `test_cli_rejects_empty_target` and `test_cli_rejects_oversized_target` assert
   that the CLI's two input-validation error paths (an empty find string, and one
   over `MAX_NEEDLE` codepoints) fail closed with the expected error text and no

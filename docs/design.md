@@ -103,11 +103,11 @@ surface. Review its security fixes before changing the pin.
 ## Known limitations
 
 - An embedded file (`/EmbeddedFiles`) is not rewritten: its format is arbitrary
-  binary, and editing it blind risks corrupting it. The independent scan detects
-  the target in an embedded file stream and fails closed, so a file that still
-  contains the target in an attachment is refused. `T4Result.residual` counts
-  the target across every surface, so a remaining occurrence anywhere reports a
-  non-zero residual and a failure.
+  binary, and editing it without parsing its format risks corrupting it. The
+  independent scan detects the target in an embedded file stream and fails
+  closed, so a file that still contains the target in an attachment is
+  refused. `T4Result.residual` counts the target across every surface, so a
+  remaining occurrence anywhere reports a non-zero residual and a failure.
 - An appearance stream that draws the target as its own content (a custom
   annotation or widget `/AP` that bakes in the text rather than deriving it from
   the field value) is not rewritten. The scan detects the target there and fails
@@ -119,8 +119,12 @@ surface. Review its security fixes before changing the pin.
   not resolve to a value, is refused before anything is saved.
 - Text that is an image (a scan) has no text layer to remove and is out of
   scope. OCR is not performed.
-- `FileMetadata.apply(to:)` removes the `com.apple.quarantine` and
-  `com.apple.provenance` extended attributes with `removexattr` and returns a
-  description of each removal the OS refuses, except for an absent attribute.
-  APFS may keep projecting `com.apple.provenance` onto the exported file
-  regardless of a successful call.
+- `FileMetadata` neither copies nor compares `com.apple.quarantine`,
+  `com.apple.provenance` or `com.apple.macl` (`systemOwnedAttributes`). macOS
+  stamps the exported file with its own values for them. `apply(to:)` copies
+  every other extended attribute with `setxattr` and returns a description of
+  each one the OS refuses.
+- After an export whose attributes all match the original,
+  `EditorModel.clear()` drops the document, its metadata, the file path, the
+  find and replace text and the status, and the drop screen is shown. An export
+  that reports a refused or differing item keeps the document open.
