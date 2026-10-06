@@ -27,6 +27,7 @@ from fixtures.generate import (
 
 TARGET: Final = "OLDNAME"
 REPLACEMENT: Final = "NEWNAME"
+MAX_TARGET_CODEPOINTS: Final = 256
 
 
 @pytest.fixture(scope="session")
@@ -52,10 +53,14 @@ def _extract_text(path: Path) -> str:
 
 
 def _run_cli(
-    cli: Path, in_pdf: Path, out_pdf: Path
+    cli: Path,
+    in_pdf: Path,
+    out_pdf: Path,
+    find: str = TARGET,
+    replace: str = REPLACEMENT,
 ) -> subprocess.CompletedProcess[str]:
     return subprocess.run(
-        [str(cli), str(in_pdf), str(out_pdf), TARGET, REPLACEMENT],
+        [str(cli), str(in_pdf), str(out_pdf), find, replace],
         capture_output=True,
         text=True,
         check=False,
@@ -76,12 +81,7 @@ def test_replace_preserves_metadata(
     assert in_pdf is not None, f"{name} fixture was not generated"
 
     out_pdf = tmp_path / f"{name}.out.pdf"
-    result = subprocess.run(
-        [str(cli_binary), str(in_pdf), str(out_pdf), TARGET, REPLACEMENT],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
+    result = _run_cli(cli_binary, in_pdf, out_pdf)
     assert out_pdf.exists(), (
         f"CLI produced no output file; stdout={result.stdout!r} "
         f"stderr={result.stderr!r}"
@@ -350,12 +350,7 @@ def test_scrub_removes_astral_target(
         build_astral_info_only(in_pdf, ASTRAL_TARGET)
 
     out_pdf = tmp_path / f"{name}.astral.out.pdf"
-    result = subprocess.run(
-        [str(cli_binary), str(in_pdf), str(out_pdf), ASTRAL_TARGET, REPLACEMENT],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
+    result = _run_cli(cli_binary, in_pdf, out_pdf, ASTRAL_TARGET, REPLACEMENT)
     assert out_pdf.exists(), (
         f"CLI produced no output; stdout={result.stdout!r} stderr={result.stderr!r}"
     )
@@ -386,12 +381,7 @@ def test_cli_rejects_empty_target(
     in_pdf = fixture_pdfs["simple"]
     assert in_pdf is not None
     out_pdf = tmp_path / "empty_target.out.pdf"
-    result = subprocess.run(
-        [str(cli_binary), str(in_pdf), str(out_pdf), "", REPLACEMENT],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
+    result = _run_cli(cli_binary, in_pdf, out_pdf, "", REPLACEMENT)
     assert result.returncode != 0, (
         f"CLI accepted an empty find string; {result.stdout!r}"
     )
@@ -409,17 +399,13 @@ def test_cli_rejects_oversized_target(
     in_pdf = fixture_pdfs["simple"]
     assert in_pdf is not None
     out_pdf = tmp_path / "oversized_target.out.pdf"
-    oversized = "A" * 257
-    result = subprocess.run(
-        [str(cli_binary), str(in_pdf), str(out_pdf), oversized, REPLACEMENT],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
+    oversized = "A" * (MAX_TARGET_CODEPOINTS + 1)
+    result = _run_cli(cli_binary, in_pdf, out_pdf, oversized, REPLACEMENT)
     assert result.returncode != 0, (
-        f"CLI accepted a 257-codepoint find string; {result.stdout!r}"
+        f"CLI accepted a {MAX_TARGET_CODEPOINTS + 1}-codepoint find string; "
+        f"{result.stdout!r}"
     )
-    assert "256" in result.stdout, (
+    assert str(MAX_TARGET_CODEPOINTS) in result.stdout, (
         f"missing expected limit in error text; {result.stdout!r}"
     )
     assert not out_pdf.exists(), (
@@ -434,12 +420,7 @@ def test_nul_truncated_string_fails_closed(cli_binary: Path, tmp_path: Path) -> 
         "fixture setup: target missing from input"
     )
     out_pdf = tmp_path / "nul.out.pdf"
-    result = subprocess.run(
-        [str(cli_binary), str(in_pdf), str(out_pdf), TARGET, REPLACEMENT],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
+    result = _run_cli(cli_binary, in_pdf, out_pdf)
     assert result.returncode != 0, (
         f"CLI shipped a file with NUL-blind content; {result.stdout!r}"
     )
@@ -456,12 +437,7 @@ def test_nul_escaped_name_scrubs_clean(cli_binary: Path, tmp_path: Path) -> None
         "fixture setup: target missing from input"
     )
     out_pdf = tmp_path / "nulname.out.pdf"
-    result = subprocess.run(
-        [str(cli_binary), str(in_pdf), str(out_pdf), TARGET, REPLACEMENT],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
+    result = _run_cli(cli_binary, in_pdf, out_pdf)
     fields = _result_fields(result.stdout)
     assert fields["rc"] == 0, f"clean name refused; stdout={result.stdout!r}"
     assert fields["residual"] == 0, f"residual not zero; stdout={result.stdout!r}"

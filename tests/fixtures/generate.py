@@ -13,6 +13,8 @@ from fontTools.ttLib import TTFont
 
 C_MAX_DECOMPRESSED_STREAM_BYTES: Final = 64 * 1024 * 1024
 C_MAX_CONTAINER_DEPTH: Final = 64
+DEPTH_OVER_CAP: Final = 36
+SIZE_OVER_CAP_BYTES: Final = 1024
 
 SYSTEM_TTF: Final = Path("/System/Library/Fonts/Supplemental/Arial.ttf")
 FIXTURE_ID: Final = "4e554c4c4d41524b11f1d2c3b4a59687"
@@ -310,7 +312,7 @@ def build_field_only(path: Path, target: str) -> None:
 
 
 def build_deep_nesting(
-    path: Path, target: str, depth: int = C_MAX_CONTAINER_DEPTH + 36
+    path: Path, target: str, depth: int = C_MAX_CONTAINER_DEPTH + DEPTH_OVER_CAP
 ) -> None:
     b = PdfBuilder()
     pages = b.pages
@@ -331,7 +333,7 @@ def build_oversized_xmp(path: Path) -> None:
     font = b.add(HELVETICA)
     content = b.add_stream(b"", BENIGN_BODY)
     page = b.add(_page_dict(pages, "F1", font, content))
-    oversized = b"A" * (C_MAX_DECOMPRESSED_STREAM_BYTES + 1024)
+    oversized = b"A" * (C_MAX_DECOMPRESSED_STREAM_BYTES + SIZE_OVER_CAP_BYTES)
     metadata = b.add_flate_stream(b"/Type /Metadata /Subtype /XML", oversized)
     info = b.add(info_dict_bytes("Nullmark oversized-xmp fixture"))
     b.finish(path, page, info, catalog_extra=f" /Metadata {metadata} 0 R")

@@ -2,7 +2,6 @@
 name = "nullmark-tests"
 version = "0.1.0"
 requires-python = ">=3.12"
-# The tests import fonttools and hypothesis; the justfile runs pytest and mypy.
 dependencies = [
   "fonttools==4.65.0",
   "hypothesis==6.168.4",
