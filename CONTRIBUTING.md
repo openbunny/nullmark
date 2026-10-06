@@ -16,8 +16,8 @@ How to build, test, and submit a change to `nullmark`.
 ## Development
 
 - Install the toolchain and the git hooks once per clone: `just install`.
-  `mise.toml` pins the tools. Xcode, and MuPDF, LLVM and cppcheck under
-  `/opt/homebrew`, come from the machine; the header of the `justfile` lists
+  `mise.toml` pins the tools. Xcode, and LLVM and cppcheck under
+  `/opt/homebrew`, come from the machine; `CMakeLists.txt` pins MuPDF; the header of the `justfile` lists
   them.
 - `lefthook.yml` runs `fmt-check`, `lint`, `typecheck` and `secrets` before each
   commit and `just check` before each push.
@@ -76,7 +76,6 @@ issue.
 
 Open an issue with the exact steps run, the observed behaviour including any
 error text and residual-text report, the expected result, the nullmark version,
-the macOS version and architecture, and the output of
-`brew list --versions mupdf`. Describe the input document, the text and layout
-that trigger the bug; do not attach it or a screenshot of it. For a security
+and the macOS version and architecture. Describe the input document, the text
+and layout that trigger the bug; do not attach it or a screenshot of it. For a security
 report, follow [SECURITY.md](SECURITY.md) instead.

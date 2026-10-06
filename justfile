@@ -1,4 +1,4 @@
-# Prerequisites outside mise.toml: Xcode, and mupdf, llvm and cppcheck under
+# Prerequisites outside mise.toml: Xcode, and llvm and cppcheck under
 # /opt/homebrew. Apple's clang ships no libFuzzer or LeakSanitizer.
 set shell := ["bash", "-euo", "pipefail", "-c"]
 
@@ -39,11 +39,11 @@ typecheck:
 test: build
     ctest --preset pytest
 
-app:
+app: build
     xcodegen generate
     xcodebuild build -project Nullmark.xcodeproj -scheme Nullmark -configuration Release -derivedDataPath build/app
 
-xctest:
+xctest: build
     xcodegen generate
     xcodebuild test -project Nullmark.xcodeproj -scheme Nullmark CODE_SIGNING_ALLOWED=NO
 

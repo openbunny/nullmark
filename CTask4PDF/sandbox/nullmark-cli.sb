@@ -28,14 +28,13 @@
 (allow file-read* (literal (param "BIN_PATH")))
 (allow process-fork)
 
-; dyld, libSystem, MuPDF and every Homebrew dylib libmupdf.dylib links
+; dyld and libSystem, the only libraries the statically linked CLI loads
 ; (`otool -L` lists them). These paths hold system and library files, never the
 ; untrusted PDF, and the allowance is read-only.
 (allow file-read*
     (subpath "/usr/lib")
     (subpath "/System/Library")
-    (subpath "/private/var/db/dyld")
-    (subpath "/opt/homebrew"))
+    (subpath "/private/var/db/dyld"))
 (allow file-read-metadata (subpath "/private/var/db/timezone"))
 (allow file-read* (literal "/private/etc/localtime"))
 (allow sysctl-read)

@@ -9,14 +9,38 @@ set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
 
 option(NULLMARK_COVERAGE "Instrument the corpus runner for gcov coverage" OFF)
 
-find_path(MUPDF_INCLUDE_DIR mupdf/fitz.h REQUIRED)
-find_library(MUPDF_LIBRARY mupdf REQUIRED)
-add_library(mupdf UNKNOWN IMPORTED)
+include(ExternalProject)
+find_program(MAKE make REQUIRED)
+cmake_host_system_information(RESULT NPROC QUERY NUMBER_OF_LOGICAL_CORES)
+set(MUPDF_PREFIX "${CMAKE_BINARY_DIR}/mupdf")
+# Reason: MuPDF's Makefile links OpenSSL, X11 and GLUT when pkg-config finds
+# them, which would put a Homebrew dylib back on the link line of a static
+# build. The core uses none of them.
+set(MUPDF_MAKE_ARGS build=release HAVE_LIBCRYPTO=no HAVE_X11=no HAVE_GLUT=no)
+ExternalProject_Add(mupdf-source
+  URL https://mupdf.com/downloads/archive/mupdf-1.28.5-source.tar.gz
+  URL_HASH SHA256=98a5c10cda20c3992cdf76ff6b2a1149c32bd79cc796d3f703230b1185b7e934
+  DOWNLOAD_EXTRACT_TIMESTAMP ON
+  BUILD_IN_SOURCE ON
+  INSTALL_DIR "${MUPDF_PREFIX}"
+  CONFIGURE_COMMAND ""
+  BUILD_COMMAND ${CMAKE_COMMAND} -E env
+    MACOSX_DEPLOYMENT_TARGET=${CMAKE_OSX_DEPLOYMENT_TARGET}
+    ${MAKE} -j${NPROC} ${MUPDF_MAKE_ARGS} libs
+  INSTALL_COMMAND ${MAKE} ${MUPDF_MAKE_ARGS} prefix=<INSTALL_DIR> install-libs
+  BUILD_BYPRODUCTS
+    "${MUPDF_PREFIX}/lib/libmupdf.a"
+    "${MUPDF_PREFIX}/lib/libmupdf-third.a")
+file(MAKE_DIRECTORY "${MUPDF_PREFIX}/include")
+add_library(mupdf-third STATIC IMPORTED)
+set_target_properties(mupdf-third PROPERTIES
+  IMPORTED_LOCATION "${MUPDF_PREFIX}/lib/libmupdf-third.a")
+add_library(mupdf STATIC IMPORTED)
 set_target_properties(mupdf PROPERTIES
-  IMPORTED_LOCATION "${MUPDF_LIBRARY}"
-  INTERFACE_INCLUDE_DIRECTORIES "${MUPDF_INCLUDE_DIR}")
-get_filename_component(MUPDF_LIBRARY_DIR "${MUPDF_LIBRARY}" DIRECTORY)
-set(CMAKE_BUILD_RPATH "${MUPDF_LIBRARY_DIR}")
+  IMPORTED_LOCATION "${MUPDF_PREFIX}/lib/libmupdf.a"
+  INTERFACE_INCLUDE_DIRECTORIES "${MUPDF_PREFIX}/include"
+  INTERFACE_LINK_LIBRARIES mupdf-third)
+add_dependencies(mupdf mupdf-source)
 
 set(CORPUS "${CMAKE_SOURCE_DIR}/CTask4PDF/fuzz/corpus")
 set(SOURCES CTask4PDF/task4pdf.c)

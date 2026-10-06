@@ -51,10 +51,3 @@ body:
       placeholder: "macOS 26.0 arm64"
     validations:
       required: true
-  - type: input
-    id: mupdf
-    attributes:
-      label: MuPDF version
-      description: The output of `brew list --versions mupdf`.
-    validations:
-      required: false

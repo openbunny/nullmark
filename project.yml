@@ -27,21 +27,19 @@ settings:
       - '-Wall'
       - '-Wextra'
       - '-Wpedantic'
-    # MuPDF is an externally provided dylib (/opt/homebrew/lib), neither
-    # Apple-signed nor vendored into the bundle. ENABLE_HARDENED_RUNTIME is NO
-    # because hardened runtime's library validation refuses to load a dylib
-    # not signed with the app's own Team ID. App.entitlements carries no
-    # com.apple.security.app-sandbox for the same root cause: App Sandbox's
-    # default file-read scope does not cover /opt/homebrew, so a sandboxed
-    # process cannot open libmupdf.dylib to link it at launch. See README.md.
+    # Hazard: App Sandbox and the hardened runtime are off, and nothing in this
+    # build requires it. Both were turned off for a Homebrew libmupdf.dylib,
+    # which the static MuPDF link removed. Re-enabling them needs the sandbox's
+    # user-selected file entitlements and is its own change.
     ENABLE_HARDENED_RUNTIME: 'NO'
     HEADER_SEARCH_PATHS:
       - '$(PROJECT_DIR)/CTask4PDF/include'
-      - '/opt/homebrew/include'
+      - '$(PROJECT_DIR)/build/dev/mupdf/include'
     LIBRARY_SEARCH_PATHS:
-      - '/opt/homebrew/lib'
+      - '$(PROJECT_DIR)/build/dev/mupdf/lib'
     OTHER_LDFLAGS:
       - '-lmupdf'
+      - '-lmupdf-third'
 targets:
   Nullmark:
     type: 'application'

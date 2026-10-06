@@ -8,7 +8,7 @@
       "binaryDir": "${sourceDir}/build/${presetName}",
       "cacheVariables": {
         "CMAKE_C_COMPILER": "/opt/homebrew/opt/llvm/bin/clang",
-        "CMAKE_PREFIX_PATH": "/opt/homebrew"
+        "CMAKE_OSX_DEPLOYMENT_TARGET": "27.0"
       }
     },
     {

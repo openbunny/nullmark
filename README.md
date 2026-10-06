@@ -51,20 +51,20 @@ The app does not perform OCR.
 ## Install
 
 The project is published as source only: no build of the app is distributed,
-signed or notarized; it is built from a clone. A build links `libmupdf.dylib`
-from Homebrew at `/opt/homebrew/opt/mupdf/lib`, so it runs only on a Mac with
-Homebrew MuPDF installed, and it is ad-hoc signed (`Signing.xcconfig`). Without
-Homebrew MuPDF the app does not launch: dyld reports `Library not loaded:
-/opt/homebrew/opt/mupdf/lib/libmupdf.dylib`.
+signed or notarized; it is built from a clone. The build downloads the MuPDF
+source release that `CMakeLists.txt` pins by URL and SHA-256, builds it, and
+links it statically, so the app loads no MuPDF library at runtime. The first
+build needs network access to `mupdf.com`. The app is ad-hoc signed
+(`Signing.xcconfig`).
 
 Requirements:
 
 - macOS 27 or later on Apple silicon (`MACOSX_DEPLOYMENT_TARGET` in
-  `project.yml`; the build searches the Apple-silicon Homebrew prefix
-  `/opt/homebrew`).
+  `project.yml`; MuPDF is built for the host architecture only, and the build
+  runs clang from the Apple-silicon Homebrew prefix `/opt/homebrew`).
 - Xcode 27 (`.xcode-version`).
-- Homebrew: `brew install mupdf mise`. The gates also need
-  `brew install llvm cppcheck`.
+- Homebrew: `brew install mise llvm cppcheck`. The `dev` CMake preset that
+  builds MuPDF and the core runs clang-tidy and cppcheck.
 
 Build and run:
 
@@ -76,8 +76,9 @@ open build/app/Build/Products/Release/Nullmark.app
 
 `just install` installs the toolchain pinned in `mise.toml`, the Python
 environment from `tests/uv.lock` and the git hooks from `lefthook.yml`.
-`just app` generates `Nullmark.xcodeproj` from `project.yml` with `xcodegen` and
-builds a Release app. `just --list` prints every recipe.
+`just app` builds MuPDF and the core through the `dev` CMake preset, generates
+`Nullmark.xcodeproj` from `project.yml` with `xcodegen`, and builds a Release
+app. `just --list` prints every recipe.
 
 ## Use
 
@@ -142,18 +143,13 @@ the export does not carry a record of the machine that produced it.
 
 The app does not adopt App Sandbox (no `com.apple.security.app-sandbox` in
 `App.entitlements`) and disables the hardened runtime (`ENABLE_HARDENED_RUNTIME`
-is `NO` in `project.yml`). Both are dropped for the same root cause:
-`libmupdf.dylib` lives outside the bundle (`/opt/homebrew/lib`), is neither
-Apple-signed nor vendored into it, and:
-
-- the hardened runtime's library validation refuses to load a dylib not signed
-  with the app's own Team ID;
-- App Sandbox's default file-read scope does not cover `/opt/homebrew`, so a
-  sandboxed process cannot open the dylib to link it at launch.
+is `NO` in `project.yml`). Nothing in the build requires either deviation: both
+were taken for a Homebrew `libmupdf.dylib` outside the bundle, and MuPDF is
+linked statically. Re-enabling them needs the sandbox's user-selected file
+entitlements and is its own change.
 
 This deviation is scoped to this app. The standalone CLI runs under the Seatbelt
-profile `CTask4PDF/sandbox/nullmark-cli.sb` instead. Neither setting is
-re-enabled until the dylib is Apple-signed or vendored.
+profile `CTask4PDF/sandbox/nullmark-cli.sb` instead.
 
 ## Network behaviour
 

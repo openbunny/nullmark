@@ -13,7 +13,7 @@ guarantee the core makes (`tests/`). The generated Xcode project comes from
 prints the recipes. `just install` installs the pinned toolchain from
 `mise.toml`, the Python environment from `tests/uv.lock` and the git hooks
 from `lefthook.yml`; `just ci-check` runs it, then the gates. Xcode, and
-MuPDF, LLVM and cppcheck under `/opt/homebrew`, come from the machine.
+LLVM and cppcheck under `/opt/homebrew`, come from the machine.
 [README.md](README.md) and [CONTRIBUTING.md](CONTRIBUTING.md) describe setup
 and contribution terms.
 
@@ -53,16 +53,20 @@ caller must treat as one.
 
 ## MuPDF
 
-MuPDF is a Homebrew-provided dylib that parses attacker-supplied PDF input.
-The package manager installs and versions it; an upgrade is reviewed for its
-security fixes before it is installed. MuPDF is AGPL; README.md states what
-distributing a linked build requires.
+MuPDF parses attacker-supplied PDF input. `CMakeLists.txt` pins its source
+release by URL and SHA-256 and builds it as static libraries, `libmupdf.a`
+and `libmupdf-third.a`, under `build/<preset>/mupdf`; every CMake target and
+the Xcode project link that one build. An upgrade changes the URL and the hash
+together and is reviewed for its security fixes first. MuPDF is AGPL; README.md
+states what distributing a linked build requires.
 
-The app drops App Sandbox and the hardened runtime for one root cause:
-`libmupdf.dylib` is neither Apple-signed nor vendored, so library validation
-refuses it and the sandbox's default file-read scope does not cover
-`/opt/homebrew`. `project.yml` records this in a comment at the settings that
-disable them. Do not re-enable either without resolving that.
+The Makefile flags in `MUPDF_MAKE_ARGS` keep OpenSSL, X11 and GLUT off the link
+line. Do not remove one without confirming `otool -L` on the app still lists no
+library outside `/usr/lib` and `/System`.
+
+The app runs without App Sandbox and the hardened runtime. Both were turned off
+for a Homebrew `libmupdf.dylib` that the static link removed; `project.yml`
+records this at the settings. Re-enabling them is its own change.
 
 ## C core
 
