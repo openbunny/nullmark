@@ -14,39 +14,6 @@ final class EditorModel {
     case failure(String)
   }
 
-  enum SaveError: LocalizedError {
-    case data(name: String, reason: String)
-    case metadata(name: String, reason: String)
-
-    var errorDescription: String? {
-      switch self {
-      case .data(let name, let reason):
-        "\(name) was not saved: \(reason). choose another location and export again."
-
-      case .metadata(let name, let reason):
-        """
-        \(name) was saved with the redacted content, but its file metadata could not be \
-        restored: \(reason). check its dates, permissions and extended attributes before \
-        sharing it.
-        """
-      }
-    }
-  }
-
-  enum ScratchError: LocalizedError {
-    case residue(URL)
-
-    var errorDescription: String? {
-      switch self {
-      case .residue(let directory):
-        """
-        the unredacted working copy at \(directory.path) could not be deleted. \
-        it still contains the original text; remove it manually.
-        """
-      }
-    }
-  }
-
   private struct Loaded: Sendable {
     let data: Data
     let metadata: FileMetadata
@@ -221,7 +188,10 @@ final class EditorModel {
   private func acceptApplyOutcome(_ outcome: Replacement, find: String) {
     guard outcome.matches > 0 else {
       self.status = .failure(
-        "\"\(find)\" does not occur in the pdf's text layer. matching is case-sensitive.")
+        """
+        "\(find)" does not occur in the pdf's text layer. matching is case-sensitive. \
+        a scanned page has no text layer, so text in a scan is not found and stays visible.
+        """)
       return
     }
     guard let outputDocument = PDFDocument(data: outcome.data) else {
@@ -235,7 +205,8 @@ final class EditorModel {
     self.status = .success(
       """
       replaced \(outcome.matches) occurrence\(outcome.matches == 1 ? "" : "s") across \
-      \(pages). document metadata preserved.
+      \(pages). an independent scan of the output found no remaining occurrence on any \
+      text surface. document metadata preserved.
       """
     )
   }
@@ -277,6 +248,39 @@ final class EditorModel {
       } catch {
         self.status = .failure(error.localizedDescription)
       }
+    }
+  }
+}
+
+enum SaveError: LocalizedError {
+  case data(name: String, reason: String)
+  case metadata(name: String, reason: String)
+
+  var errorDescription: String? {
+    switch self {
+    case .data(let name, let reason):
+      "\(name) was not saved: \(reason). choose another location and export again."
+
+    case .metadata(let name, let reason):
+      """
+      \(name) was saved with the redacted content, but its file metadata could not be \
+      restored: \(reason). check its dates, permissions and extended attributes before \
+      sharing it.
+      """
+    }
+  }
+}
+
+enum ScratchError: LocalizedError {
+  case residue(URL)
+
+  var errorDescription: String? {
+    switch self {
+    case .residue(let directory):
+      """
+      the unredacted working copy at \(directory.path) could not be deleted. \
+      it still contains the original text; remove it manually.
+      """
     }
   }
 }

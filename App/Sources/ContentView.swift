@@ -100,6 +100,8 @@ struct ContentView: View {
     if let status = model.status {
       statusLine(status)
     }
+    StatusMessage(
+      "text drawn as an image, such as a scan, is neither found nor changed.", tone: .neutral)
   }
 
   @ViewBuilder private var preview: some View {
