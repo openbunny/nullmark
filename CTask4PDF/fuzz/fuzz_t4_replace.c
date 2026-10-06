@@ -24,7 +24,10 @@ static int make_temp(char *buf, const char *tag) {
     if (dir == NULL || dir[0] == '\0') {
         dir = "/tmp";
     }
-    snprintf(buf, PATH_CAP, "%s/t4_fuzz_%s_XXXXXX", dir, tag);
+    int n = snprintf(buf, PATH_CAP, "%s/t4_fuzz_%s_XXXXXX", dir, tag);
+    if (n < 0 || n >= PATH_CAP) {
+        return -1;
+    }
     return mkstemp(buf);
 }
 

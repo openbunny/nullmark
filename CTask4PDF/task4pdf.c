@@ -244,7 +244,7 @@ static void append_form(fz_context *ctx, pdf_document *doc, pdf_page *page, fz_r
 
     char name[XOBJ_NAME_CAP];
     for (int i = 0;; i++) {
-        snprintf(name, sizeof name, "T4R%d", i);
+        (void)snprintf(name, sizeof name, "T4R%d", i);
         if (!pdf_dict_gets(ctx, xobj, name)) {
             break;
         }
@@ -252,7 +252,7 @@ static void append_form(fz_context *ctx, pdf_document *doc, pdf_page *page, fz_r
     pdf_dict_puts(ctx, xobj, name, form_ref);
 
     char op[OP_CAP];
-    snprintf(op, sizeof op, "q /%s Do Q\n", name);
+    (void)snprintf(op, sizeof op, "q /%s Do Q\n", name);
     fz_buffer *cbuf = fz_new_buffer(ctx, OP_CAP);
     fz_append_string(ctx, cbuf, op);
     pdf_obj *cstream = pdf_add_stream(ctx, doc, cbuf, NULL, 0);
@@ -1338,20 +1338,20 @@ int t4_replace(const char *in_path, const char *out_path, const char *find, cons
     int needle[MAX_NEEDLE];
     int needle_len = decode_codepoints(find, needle, MAX_NEEDLE);
     if (needle_len == 0) {
-        snprintf(out->error, sizeof out->error, "The text to replace is empty.");
+        (void)snprintf(out->error, sizeof out->error, "The text to replace is empty.");
         discard_output(out_path);
         return 1;
     }
     if (needle_len > MAX_NEEDLE) {
-        snprintf(out->error, sizeof out->error,
-                 "The text to replace is longer than the %d-character limit.", MAX_NEEDLE);
+        (void)snprintf(out->error, sizeof out->error,
+                       "The text to replace is longer than the %d-character limit.", MAX_NEEDLE);
         discard_output(out_path);
         return 1;
     }
 
     fz_context *ctx = fz_new_context(NULL, NULL, FZ_STORE_DEFAULT);
     if (!ctx) {
-        snprintf(out->error, sizeof out->error, "MuPDF context could not be created.");
+        (void)snprintf(out->error, sizeof out->error, "MuPDF context could not be created.");
         discard_output(out_path);
         return 1;
     }
@@ -1457,7 +1457,7 @@ int t4_replace(const char *in_path, const char *out_path, const char *find, cons
         fz_drop_page(ctx, (fz_page *)page);
     }
     fz_catch(ctx) {
-        snprintf(out->error, sizeof out->error, "%s", fz_caught_message(ctx));
+        (void)snprintf(out->error, sizeof out->error, "%s", fz_caught_message(ctx));
         pdf_drop_document(ctx, doc);
         fz_drop_context(ctx);
         discard_output(out_path);
@@ -1469,12 +1469,14 @@ int t4_replace(const char *in_path, const char *out_path, const char *find, cons
     int rc = 0;
     fz_try(ctx) { out->residual = verify_residual(ctx, out_path, find, needle, needle_len); }
     fz_catch(ctx) {
-        snprintf(out->error, sizeof out->error, "Output verification could not run: %s",
-                 fz_caught_message(ctx));
+        (void)snprintf(out->error, sizeof out->error, "Output verification could not run: %s",
+                       fz_caught_message(ctx));
         rc = 1;
     }
 
     fz_drop_context(ctx);
+    // cppcheck-suppress knownConditionTrueFalse ; cppcheck does not model the setjmp in fz_try, so
+    // it sees only the fz_catch path that sets rc.
     if (rc != 0 || out->residual != 0) {
         discard_output(out_path);
     }
@@ -1493,6 +1495,8 @@ int main(int argc, char **argv) {
     int rc = t4_replace(argv[ARG_IN], argv[ARG_OUT], argv[ARG_FIND], argv[ARG_REPLACE], &r);
     printf("rc=%d matches=%" PRId64 " pages=%d residual=%" PRId64 " error=%s\n", rc, r.matches,
            r.pages_changed, r.residual, r.error);
+    // cppcheck-suppress knownConditionTrueFalse ; t4_replace returns 0 on success through fz_try,
+    // which cppcheck does not model.
     return rc || r.residual ? 1 : 0;
 }
 #endif
