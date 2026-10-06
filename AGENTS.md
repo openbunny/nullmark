@@ -153,8 +153,9 @@ One exception, granted by the owner, covers the empty state in `preview` in
 `App/Sources/ContentView.swift` and nothing else: it composes its layout in
 place of `StatusBanner`, which takes a plain-string title and cannot hold the
 inline `select` button, and it shows the decorative `PuppyView` animation from
-`App/Assets.xcassets/Puppy.dataset`. Another view that does either follows the
-rules above.
+`App/Assets.xcassets/Puppy.dataset`, or from
+`App/Assets.xcassets/PuppyWalk.dataset` after an export clears the document.
+Another view that does either follows the rules above.
 
 ## Documentation states the present
 

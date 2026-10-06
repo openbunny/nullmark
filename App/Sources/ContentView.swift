@@ -116,13 +116,13 @@ struct ContentView: View {
         .padding(Spacing.loose)
     } else {
       VStack(spacing: Spacing.base) {
-        PuppyView()
+        PuppyView(asset: model.exported ? "PuppyWalk" : "Puppy")
           .frame(width: puppyWidth, height: puppyHeight)
         HStack(spacing: Spacing.base) {
           Text("drop or")
           Button("select", action: model.choose)
             .buttonStyle(.outline)
-          Text("a pdf for the puppy")
+          Text(model.exported ? "a pdf to play again" : "a pdf to play")
         }
         .font(.themeTitle)
         .foregroundStyle(Color.foreground)
@@ -257,7 +257,7 @@ struct NullmarkMark: View {
 }
 
 private struct PuppyView: NSViewRepresentable {
-  private static let image = NSDataAsset(name: "Puppy").flatMap { NSImage(data: $0.data) }
+  let asset: String
 
   func makeNSView(context _: Context) -> NSImageView {
     let view = NSImageView()
@@ -270,7 +270,10 @@ private struct PuppyView: NSViewRepresentable {
   }
 
   func updateNSView(_ view: NSImageView, context _: Context) {
-    if view.image !== Self.image { view.image = Self.image }
+    if view.identifier?.rawValue != asset {
+      view.identifier = NSUserInterfaceItemIdentifier(asset)
+      view.image = NSDataAsset(name: asset).flatMap { NSImage(data: $0.data) }
+    }
   }
 }
 

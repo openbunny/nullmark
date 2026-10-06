@@ -121,8 +121,11 @@ built for anything but arm64. `just --list` prints every recipe.
    leaves the document unchanged. Text in a scan is neither found nor changed.
 4. Choose **export pdf…** (⌘S) to write the edited copy to a new file. The
    original file is not modified. The export restores the creation and
-   modification dates, permissions and extended attributes, and reports any
-   that differ.
+   modification dates, permissions and extended attributes. When every one
+   matches the original, the app clears the document, its metadata, the find
+   and replace fields and the status line, and returns to the drop screen.
+   When any differs, the app keeps the document open and the status line names
+   each one.
 
 ## Security
 
@@ -169,8 +172,7 @@ export, except the `com.apple.quarantine`, `com.apple.provenance` and
 `com.apple.macl` extended attributes. macOS writes those on every file the
 sandboxed app creates and refuses or overrides a value the app sets, so the
 export carries the app's quarantine record and provenance, not the original's.
-`FileMetadata.differences` excludes them, and the export's success message
-names them.
+`FileMetadata.differences` excludes them.
 
 ## Sandbox and hardened runtime
 

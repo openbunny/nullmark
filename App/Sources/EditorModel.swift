@@ -37,6 +37,7 @@ final class EditorModel {
   private(set) var edited = false
   private(set) var status: Status?
   private(set) var isApplying = false
+  private(set) var exported = false
   var findText = ""
   var replaceText = ""
 
@@ -141,6 +142,7 @@ final class EditorModel {
         self.fileMetadata = loaded.metadata
         self.metadata = PDFMetadata(document: pdf, data: loaded.data)
         self.edited = false
+        self.exported = false
         self.status = .info("metadata captured. enter the text to replace.")
       } catch {
         guard ticket == self.generation else {
@@ -211,6 +213,21 @@ final class EditorModel {
     )
   }
 
+  private func clear() {
+    generation += 1
+    isApplying = false
+    fileURL = nil
+    metadata = nil
+    fileMetadata = nil
+    document = nil
+    data = nil
+    edited = false
+    status = nil
+    findText = ""
+    replaceText = ""
+    exported = true
+  }
+
   func rejectDrop(_ urls: [URL]) {
     let name = urls.first?.lastPathComponent ?? "the dropped item"
     status = .failure("\(name) is not a pdf. drop a file with the .pdf extension.")
@@ -226,22 +243,14 @@ final class EditorModel {
     guard panel.runModal() == .OK, let url = panel.url else {
       return
     }
+    let ticket = generation
     Task {
       do {
         let diff = try await Task.detached {
           try Self.write(data: data, metadata: fileMetadata, to: url)
         }.value
         if diff.refused.isEmpty, diff.differences.isEmpty {
-          let count = fileMetadata.copiedAttributes.count
-          let attributes = "\(count) extended attribute\(count == 1 ? "" : "s")"
-          let systemOwned = FileMetadata.systemOwnedAttributes.joined(separator: ", ")
-          self.status = .success(
-            """
-            saved \(url.lastPathComponent). creation and modification dates, permissions \
-            and \(attributes) verified identical. macos sets \(systemOwned) on the \
-            exported file itself, so they were not copied.
-            """
-          )
+          if ticket == self.generation { self.clear() }
         } else {
           self.status = .failure(
             "saved \(url.lastPathComponent), but these items differ from the original: "

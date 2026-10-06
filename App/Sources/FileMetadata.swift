@@ -27,7 +27,7 @@ struct FileMetadata: Equatable {
   private static let keys: Set<URLResourceKey> = [
     .creationDateKey, .contentModificationDateKey, .contentAccessDateKey, .hasHiddenExtensionKey,
   ]
-  static let systemOwnedAttributes = [
+  private static let systemOwnedAttributes = [
     "com.apple.macl", "com.apple.provenance", "com.apple.quarantine",
   ]
 
@@ -39,7 +39,7 @@ struct FileMetadata: Equatable {
   let extensionHidden: Bool?
   let extendedAttributes: [String: Data]
 
-  var copiedAttributes: [String: Data] {
+  private var copiedAttributes: [String: Data] {
     extendedAttributes.filter { !Self.systemOwnedAttributes.contains($0.key) }
   }
 
