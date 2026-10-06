@@ -32,7 +32,7 @@ struct CopyButton: View {
       .buttonStyle(.outline)
       .accessibilityLabel(label)
       if state == .failed {
-        Text("\(label) failed. \(failureHint)")
+        Text(verbatim: "\(label) failed. \(failureHint)")
           .font(.themeCaption)
           .foregroundStyle(Color.foreground.opacity(Self.failureOpacity))
           .multilineTextAlignment(.trailing)

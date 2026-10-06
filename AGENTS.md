@@ -121,8 +121,10 @@ The app follows the same component rules as the openbunny websites:
 
 - UI copy is lowercase: labels, headings, buttons and status messages. A
   literal (a file name, a PDF key, `U+0000`) keeps its own case.
-- Sections are separated by a 1-point `border` rule under a numbered
+- Sections are `PageSection`: a 1-point `border` rule above a numbered
   `SectionHeading`. At most two regions carry a filled ground.
+- Building blocks live in `App/Sources/Components/` and each appears in
+  `ComponentGallery`; a view-local copy of one is a second system.
 - `sprout` marks state only. A link uses `LinkButtonStyle`: `ink` text with a
   `line` underline.
 - No decorative icons. Text drawn from data is `Text(verbatim:)`, so a file
