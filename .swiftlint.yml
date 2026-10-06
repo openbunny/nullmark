@@ -5,16 +5,17 @@ opt_in_rules:
   - 'all'
 disabled_rules:
   # Each rule below conflicts with swift-format's output, which fmt-check
-  # enforces, or with a rule in languages/swift.md.
+  # enforces, or with a rule this repository's Swift follows.
   - 'contrasted_opening_brace' # swift-format places an opening brace on the line it opens.
-  - 'explicit_acl' # swift.md: module access is the default.
-  - 'explicit_top_level_acl' # swift.md: module access is the default.
-  - 'explicit_type_interface' # swift.md: types are inferred where the compiler can.
+  - 'explicit_acl' # module access is the default.
+  - 'explicit_top_level_acl' # module access is the default.
+  - 'explicit_type_interface' # types are inferred where the compiler can.
   - 'extension_access_modifier' # swift-format moves an extension's access modifier onto each member.
   - 'multiline_arguments_brackets' # swift-format keeps a closing bracket on the last argument's line.
-  - 'one_declaration_per_file' # swift.md: access is narrow, and a private helper view would widen to move.
-  - 'prefixed_toplevel_constant' # swift.md: constants use lowerCamelCase, with no `k` prefix.
-  - 'required_deinit' # swift.md: no boilerplate that adds no invariant.
+  - 'pattern_matching_keywords' # swift-format writes let on each bound associated value.
+  - 'one_declaration_per_file' # access is narrow, and a private helper view would widen to move.
+  - 'prefixed_toplevel_constant' # constants use lowerCamelCase, with no `k` prefix.
+  - 'required_deinit' # no boilerplate that adds no invariant.
   - 'sorted_imports' # swift-format orders imports by byte value, so `os` follows `SwiftUI`.
 file_types_order:
   order:

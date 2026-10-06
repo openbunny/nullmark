@@ -17,9 +17,9 @@ ignore = [
   "COM812",
   # REUSE.toml assigns copyright and licence to every path.
   "CPY001",
-  # languages/python.md forbids docstrings.
+  # Docstrings are not used; names and types carry the meaning.
   "D",
-  # languages/python.md permits assert in a pytest body and in a helper invariant.
+  # assert is the pytest assertion form and states helper invariants.
   "S101",
   # Every subprocess runs mutool, cc or a CLI this suite builds, with arguments the suite generates.
   "S603",
