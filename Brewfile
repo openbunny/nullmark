@@ -1,2 +1,0 @@
-brew "cppcheck"
-brew "llvm"

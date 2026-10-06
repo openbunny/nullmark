@@ -63,8 +63,7 @@ Requirements:
   `project.yml`; MuPDF is built for the host architecture only, and the build
   runs clang from the Apple-silicon Homebrew prefix `/opt/homebrew`).
 - Xcode 27 (`.xcode-version`).
-- Homebrew and `brew install mise`. `just install` installs `llvm` and
-  `cppcheck` from the `Brewfile`. The `dev` CMake preset that
+- Homebrew: `brew install mise llvm cppcheck`. The `dev` CMake preset that
   builds MuPDF and the core runs clang-tidy and cppcheck.
 
 Build and run:

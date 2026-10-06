@@ -1,5 +1,5 @@
-# Prerequisites outside mise.toml: Xcode, and the Brewfile's llvm and cppcheck
-# under /opt/homebrew. Apple's clang ships no libFuzzer or LeakSanitizer.
+# Prerequisites outside mise.toml: Xcode, and llvm and cppcheck under
+# /opt/homebrew. Apple's clang ships no libFuzzer or LeakSanitizer.
 set shell := ["bash", "-euo", "pipefail", "-c"]
 
 export PATH := "/opt/homebrew/opt/llvm/bin:" + env("PATH")
@@ -11,7 +11,6 @@ check: fmt-check lint typecheck test xctest fuzz coverage actions secrets reuse
 ci-check: install check
 
 install:
-    brew bundle --file Brewfile
     mise install
     uv sync --frozen --project tests
     lefthook install

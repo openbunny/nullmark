@@ -12,9 +12,8 @@ guarantee the core makes (`tests/`). The generated Xcode project comes from
 `just check` runs every gate and stops at the first failure. `just --list`
 prints the recipes. `just install` installs the pinned toolchain from
 `mise.toml`, the Python environment from `tests/uv.lock` and the git hooks
-from `lefthook.yml`, and Homebrew's LLVM and cppcheck from the `Brewfile`;
-`just ci-check` runs it, then the gates. Xcode and Homebrew come from the
-machine.
+from `lefthook.yml`; `just ci-check` runs it, then the gates. Xcode, and
+LLVM and cppcheck under `/opt/homebrew`, come from the machine.
 [README.md](README.md) and [CONTRIBUTING.md](CONTRIBUTING.md) describe setup
 and contribution terms.
 

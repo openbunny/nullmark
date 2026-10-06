@@ -16,9 +16,9 @@ How to build, test, and submit a change to `nullmark`.
 ## Development
 
 - Install the toolchain and the git hooks once per clone: `just install`.
-  `mise.toml` pins the tools, the `Brewfile` names Homebrew's LLVM and
-  cppcheck, and `CMakeLists.txt` pins MuPDF. Xcode and Homebrew come from the
-  machine.
+  `mise.toml` pins the tools. Xcode, and LLVM and cppcheck under
+  `/opt/homebrew`, come from the machine; `CMakeLists.txt` pins MuPDF; the header of the `justfile` lists
+  them.
 - `lefthook.yml` runs `fmt-check`, `lint`, `typecheck` and `secrets` before each
   commit and `just check` before each push.
 - Run `just check` before opening a pull request. It stops at the first failure.
