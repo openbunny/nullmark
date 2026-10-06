@@ -1,4 +1,20 @@
 {
   $schema: "https://docs.renovatebot.com/renovate-schema.json",
   extends: ["github>openbunny/.github"],
+  customManagers: [
+    {
+      customType: "regex",
+      managerFilePatterns: ["/^CMakeLists\\.txt$/"],
+      matchStrings: ["set\\(MUPDF_VERSION (?<currentValue>\\d+\\.\\d+\\.\\d+)\\)"],
+      datasourceTemplate: "github-tags",
+      depNameTemplate: "ArtifexSoftware/mupdf",
+      versioningTemplate: "semver",
+    },
+  ],
+  packageRules: [
+    {
+      matchDepNames: ["ArtifexSoftware/mupdf"],
+      automerge: false,
+    },
+  ],
 }

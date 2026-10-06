@@ -54,10 +54,14 @@ caller must treat as one.
 ## MuPDF
 
 MuPDF parses attacker-supplied PDF input. `CMakeLists.txt` pins its source
-release by URL and SHA-256 and builds it as static libraries, `libmupdf.a`
-and `libmupdf-third.a`, under `build/<preset>/mupdf`; every CMake target and
-the Xcode project link that one build. An upgrade changes the URL and the hash
-together and is reviewed for its security fixes first. MuPDF is AGPL; README.md
+release by `MUPDF_VERSION` and SHA-256 and builds it as static libraries,
+`libmupdf.a` and `libmupdf-third.a`, under `build/<preset>/mupdf`; every CMake
+target and the Xcode project link that one build. An upgrade changes the
+version and the hash together and is reviewed for its security fixes first.
+Renovate proposes the version from the `ArtifexSoftware/mupdf` tags but cannot
+compute the hash, so its pull request fails at download with a hash mismatch
+until a reviewer updates `URL_HASH`; that failure is intended and is not worked
+around. MuPDF is AGPL; README.md
 states what distributing a linked build requires.
 
 The Makefile flags in `MUPDF_MAKE_ARGS` keep OpenSSL, X11 and GLUT off the link

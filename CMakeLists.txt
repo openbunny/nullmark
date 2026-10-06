@@ -17,8 +17,9 @@ set(MUPDF_PREFIX "${CMAKE_BINARY_DIR}/mupdf")
 # them, which would put a Homebrew dylib back on the link line of a static
 # build. The core uses none of them.
 set(MUPDF_MAKE_ARGS build=release HAVE_LIBCRYPTO=no HAVE_X11=no HAVE_GLUT=no)
+set(MUPDF_VERSION 1.28.5)
 ExternalProject_Add(mupdf-source
-  URL https://mupdf.com/downloads/archive/mupdf-1.28.5-source.tar.gz
+  URL https://mupdf.com/downloads/archive/mupdf-${MUPDF_VERSION}-source.tar.gz
   URL_HASH SHA256=98a5c10cda20c3992cdf76ff6b2a1149c32bd79cc796d3f703230b1185b7e934
   DOWNLOAD_EXTRACT_TIMESTAMP ON
   BUILD_IN_SOURCE ON
