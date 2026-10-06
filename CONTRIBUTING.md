@@ -56,7 +56,8 @@ changes since the previous tag.
 3. Push the tag `vX.Y.Z` on that commit to `origin`.
 4. `.github/workflows/release.yml` builds, attests and uploads the assets, and
    creates the release with generated notes if none exists for the tag. The
-   workflow fails if the tag version differs from `MARKETING_VERSION`.
+   workflow fails before attesting anything if the tag version differs from
+   `MARKETING_VERSION`.
 
 ## Developer Certificate of Origin
 

@@ -52,7 +52,10 @@ dist: build
     version=$(xcodebuild -project Nullmark.xcodeproj -target Nullmark -configuration Release -showBuildSettings | awk '$1 == "MARKETING_VERSION" { print $3; exit }')
     test -n "$version"
     codesign --verify --strict "$app"
-    if codesign -d --entitlements - "$app" 2>&1 | grep -q get-task-allow; then echo "$app carries get-task-allow" >&2; exit 1; fi
+    entitlements=$(codesign -d --entitlements - "$app" 2>&1)
+    if grep -q get-task-allow <<<"$entitlements"; then echo "$app carries get-task-allow" >&2; exit 1; fi
+    archs=$(lipo -archs "$app/Contents/MacOS/Nullmark")
+    if test "$archs" != arm64; then echo "$app is built for $archs, expected arm64 only" >&2; exit 1; fi
     foreign=$(otool -L "$app/Contents/MacOS/Nullmark" | tail -n +2 | awk '{ print $1 }' | grep -vE '^(/usr/lib/|/System/)' || true)
     if test -n "$foreign"; then echo "$app links outside /usr/lib and /System:" >&2; echo "$foreign" >&2; exit 1; fi
     rm -rf build/dist

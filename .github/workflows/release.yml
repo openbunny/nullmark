@@ -28,6 +28,10 @@ jobs:
         run: brew install llvm cppcheck
       - name: dist
         run: just dist
+      - name: match the tag to the built version
+        env:
+          TAG: ${{ github.ref_name }}
+        run: test -f "build/dist/Nullmark-${TAG#v}.zip"
       - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
         with:
           subject-path: |
@@ -39,6 +43,5 @@ jobs:
           GH_REPO: ${{ github.repository }}
           TAG: ${{ github.ref_name }}
         run: |
-          test -f "build/dist/Nullmark-${TAG#v}.zip"
           gh release view "$TAG" > /dev/null 2>&1 || gh release create "$TAG" --verify-tag --generate-notes --title "$TAG"
-          gh release upload "$TAG" build/dist/Nullmark-*.zip build/dist/SHA256SUMS --clobber
+          gh release upload "$TAG" build/dist/Nullmark-*.zip build/dist/SHA256SUMS
