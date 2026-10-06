@@ -61,8 +61,8 @@ targets:
         INFOPLIST_FILE: 'App/Info.plist'
         CODE_SIGN_ENTITLEMENTS: 'App/App.entitlements'
         SWIFT_OBJC_BRIDGING_HEADER: 'App/Nullmark-Bridging-Header.h'
-        MARKETING_VERSION: '0.2.0'
-        CURRENT_PROJECT_VERSION: 2
+        MARKETING_VERSION: '0.2.1'
+        CURRENT_PROJECT_VERSION: 3
       configs:
         Release:
           CODE_SIGN_INJECT_BASE_ENTITLEMENTS: 'NO'
