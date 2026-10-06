@@ -14,6 +14,25 @@ final class EditorModel {
     case failure(String)
   }
 
+  enum SaveError: LocalizedError {
+    case data(name: String, reason: String)
+    case metadata(name: String, reason: String)
+
+    var errorDescription: String? {
+      switch self {
+      case .data(let name, let reason):
+        "\(name) was not saved: \(reason). choose another location and export again."
+
+      case .metadata(let name, let reason):
+        """
+        \(name) was saved with the redacted content, but its file metadata could not be \
+        restored: \(reason). check its dates, permissions and extended attributes before \
+        sharing it.
+        """
+      }
+    }
+  }
+
   enum ScratchError: LocalizedError {
     case residue(URL)
 
@@ -22,7 +41,7 @@ final class EditorModel {
       case .residue(let directory):
         """
         the unredacted working copy at \(directory.path) could not be deleted. \
-        It still contains the original text; remove it manually.
+        it still contains the original text; remove it manually.
         """
       }
     }
@@ -83,10 +102,18 @@ final class EditorModel {
   nonisolated private static func write(
     data: Data, metadata: FileMetadata, to url: URL
   ) throws -> MetadataDiff {
-    try data.write(to: url, options: .atomic)
-    let refused = try metadata.apply(to: url)
-    let written = try FileMetadata(url: url)
-    return MetadataDiff(refused: refused, differences: metadata.differences(from: written))
+    do {
+      try data.write(to: url, options: .atomic)
+    } catch {
+      throw SaveError.data(name: url.lastPathComponent, reason: error.localizedDescription)
+    }
+    do {
+      let refused = try metadata.apply(to: url)
+      let written = try FileMetadata(url: url)
+      return MetadataDiff(refused: refused, differences: metadata.differences(from: written))
+    } catch {
+      throw SaveError.metadata(name: url.lastPathComponent, reason: error.localizedDescription)
+    }
   }
 
   nonisolated private static func withScratchDirectory<T>(
@@ -213,6 +240,11 @@ final class EditorModel {
     )
   }
 
+  func rejectDrop(_ urls: [URL]) {
+    let name = urls.first?.lastPathComponent ?? "the dropped item"
+    status = .failure("\(name) is not a pdf. drop a file with the .pdf extension.")
+  }
+
   func export() {
     guard let data, let fileURL, let fileMetadata else {
       return
@@ -233,8 +265,8 @@ final class EditorModel {
           let attributes = "\(count) extended attribute\(count == 1 ? "" : "s")"
           self.status = .success(
             """
-            saved \(url.lastPathComponent). file dates, permissions and \
-            \(attributes) verified identical.
+            saved \(url.lastPathComponent). creation and modification dates, permissions \
+            and \(attributes) verified identical.
             """
           )
         } else {
@@ -243,8 +275,7 @@ final class EditorModel {
               + (diff.refused + diff.differences).joined(separator: ", "))
         }
       } catch {
-        self.status = .failure(
-          "\(url.lastPathComponent) could not be saved: \(error.localizedDescription)")
+        self.status = .failure(error.localizedDescription)
       }
     }
   }

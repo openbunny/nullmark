@@ -49,6 +49,7 @@ struct ContentView: View {
     .ignoresSafeArea()
     .dropDestination(for: URL.self) { urls, _ in
       guard let url = urls.first(where: { $0.pathExtension.lowercased() == "pdf" }) else {
+        model.rejectDrop(urls)
         return false
       }
       model.load(url)

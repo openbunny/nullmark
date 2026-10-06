@@ -12,8 +12,9 @@ struct FileMetadata: Equatable {
       case .nonUTF8AttributeName(let raw):
         let hex = raw.map { ($0 < hexRadix ? "0" : "") + String($0, radix: hexRadix) }.joined()
         return """
-          An extended attribute name is not valid UTF-8 (0x\(hex)). \
-          It cannot be preserved, so the file was not opened.
+          an extended attribute name is not valid utf-8 (0x\(hex)). it cannot be \
+          preserved, so the file was not opened. remove the attribute with xattr -d, \
+          then open the file again.
           """
 
       case .embeddedNULPath:
