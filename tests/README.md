@@ -22,14 +22,20 @@ Tests for `t4_replace` in `../CTask4PDF/task4pdf.c`, run against the standalone
 MuPDF must be installed as a workstation tool, with its headers, library and
 `mutool` available.
 
-The suite builds the CLI against MuPDF under `/opt/homebrew` with the hardened
-flags and `-Werror` (`conftest.py`), and needs `cc` and `mutool` on `PATH`. A
-missing MuPDF fails the build; the suite never skips it.
+The CMake build in `../CMakeLists.txt` compiles the CLI against MuPDF with the
+hardened flags and `-Werror`, and the CTest entry `pytest` passes its path to
+the suite as `NULLMARK_CLI`. Run outside `just test` with that variable unset,
+the suite fails rather than skips. `mutool` must be on `PATH`.
 
-Python dependencies (pytest, hypothesis, fontTools, mypy) are pinned in
+Python dependencies (pytest, hypothesis, fontTools, pikepdf, mypy) are pinned in
 `pyproject.toml` and `uv.lock`. `just install` syncs them into `tests/.venv`,
 and the justfile recipes run through `uv run`, so that environment is the one in
 effect. Nothing needs a `pip install`.
+
+`fixtures/generate.py` writes PDF bytes directly rather than through a PDF
+library: most fixtures are malformed on purpose (NUL bytes in names, a bare
+reference object, a reference cycle, trailer junk, an incremental update), and a
+library either refuses to write those constructs or repairs them.
 
 `fixtures/generate.py` imports `fontTools` at module level, and its CID-font
 fixture builds a minimal TrueType font from scratch, so that fixture depends on
@@ -42,9 +48,9 @@ the fixed `/ID` `FIXTURE_ID`.
 just test
 ```
 
-Each test run builds the CLI once per session (`cc -DT4_MAIN ...`, with the
-search paths and library `project.yml` declares) and generates the fixture PDFs
-into a pytest temp directory. No test reads a committed binary fixture.
+`just test` builds the CLI through the `dev` CMake preset, then runs the suite
+through CTest. Each run generates the fixture PDFs into a pytest temp directory.
+No test reads a committed binary fixture.
 
 The suite asserts zero residual occurrences of the target, the replacement
 present in the output text, the scrub of the Info dictionary, XMP, outlines,
@@ -86,24 +92,22 @@ that font is missing or lacks the target's glyphs.
 - the target does not appear in `mutool convert -F text` output of the redacted
   file (the zero-residual requirement);
 - the replacement does appear there;
-- for the two non-CID fixtures, the target is also absent from the raw,
-  `mutool clean -d`-decompressed content stream. The CID fixture's original run
-  is hex-coded CID data, not literal ASCII, so a literal-byte search there would
-  test nothing;
+- for the two non-CID fixtures, the target is also absent from the trailer, from
+  every object as `pikepdf` serializes it, and from every stream after
+  `pikepdf` decodes its filters, and absent from the CLI's raw output. The CID
+  fixture's original run is hex-coded CID data, not literal ASCII, so a
+  literal-byte search there would test nothing;
 - the output has exactly one `%%EOF` and no `/Prev`, checked on the CLI's own
-  raw output and not on a `mutool clean` copy. `mutool clean` stamps its own
-  `% Written by MuPDF ...` comment, which would make a same-copy check of the
-  producer string below a false positive regardless of what the CLI wrote;
+  raw output and not on a re-saved copy;
 - the raw output does not match a `MuPDF <digit>` version-string pattern
   (case-insensitive). MuPDF's save always stamps a versionless
   `% Written by MuPDF` product comment that the save API used here cannot
   suppress, so the check rejects only the version-number form, not that comment;
-- the PDF header version line, the Info dictionary (whitespace-normalized,
-  `pdfutil.normalize_ws`), the XMP packet, and both `/ID` array elements are
-  unchanged from the input, compared after running both the input and the output
-  through `mutool clean -d`. `pdfutil.py` parses the resulting classic
-  (non-object-stream) PDF text with small regexes; it is not a general PDF
-  parser.
+- the PDF header version (`pikepdf.Pdf.pdf_version`), the Info dictionary
+  (its values as `unparse()` bytes, which `qpdf` writes with sorted keys, and
+  its key order and serialization as `mutool show -g` prints them), the decoded
+  XMP packet (`read_bytes()`), and both `/ID` array elements (raw bytes) are
+  unchanged from the input. Both files are read directly, not re-saved first.
 
 These four fields are the only ones checked for byte identity. The CLI's save
 path is a full, non-incremental rewrite that renumbers every object and
@@ -142,8 +146,9 @@ prove the scrub reaches it and the verification catches what is not scrubbed:
 `test_scrub_removes_target_from_surface` runs every fixture above except
 `embedded.pdf` and `embedded_utf16le.pdf`, and also runs `objstm.pdf` from
 [Further coverage](#further-coverage). It asserts that the CLI reports `rc=0`,
-`residual=0` and `matches>=1`, that an independent `mutool clean -d`
-decompression of the output contains the replacement and not the target, and
+`residual=0` and `matches>=1`, that an independent `pikepdf` read of the output
+(every object and decoded stream, and the raw bytes) contains the replacement
+and not the target, and
 that an unrelated metadata marker on the same fixture survives unchanged. It
 also confirms the input fixture did carry the target, so a scrub that did
 nothing fails the test instead of passing it. `name_value.pdf` runs through this
@@ -165,7 +170,7 @@ read the glyphs back) must not ship.
 
 `test_redactor_hypothesis.py` widens the two oracles (redaction completeness,
 non-target byte preservation) past the hand-picked cases of `test_redactor.py`
-with Hypothesis-generated fixtures, composed the same way through `pdfutil.py`:
+with Hypothesis-generated fixtures, read the same way through `pikepdf`:
 
 - `test_scrub_completeness_and_preservation_across_surfaces` draws a target
   (arbitrary Unicode, or a run of PDF-syntax metacharacters), an unrelated
@@ -173,17 +178,19 @@ with Hypothesis-generated fixtures, composed the same way through `pdfutil.py`:
   an occurrence count, through `build_combo` in `fixtures/generate.py`.
   `build_combo` places `occurrences` non-adjacent copies of the target on every
   chosen surface at once, a case the hand-picked single-surface fixtures do not
-  cover. Checks are scoped to decoded string values (`pdfutil.string_values`,
-  plus the XMP stream's own UTF-8-decoded payload for the xmp surface), not a
-  raw substring search over `mutool clean -d` text. The raw search is unsound
-  both ways once the target can be any Unicode text or metacharacter: it can
-  miss a target present only in hex-encoded form, and it can flag ordinary PDF
-  structure that coincides with a short target by chance. A target already
-  present in the fixture's own fixed non-target bytes (the page text of
-  `BENIGN_BODY`, or the XMP template's own markup when xmp is chosen) is
-  skipped. On that input the residual check in `task4pdf.c`, a raw byte scan
-  over non-structural stream data and not only parsed PDF strings, reports a
-  residual and fails closed, which is correct and irrelevant to the property.
+  cover. Checks are scoped to decoded string values (every string in the
+  object graph, including object streams, and every string operand of the
+  page, form XObject, pattern and Type 3 glyph content streams, plus the XMP
+  stream's own UTF-8-decoded payload for the xmp surface), not a raw substring
+  search over decoded bytes. The raw search is unsound both ways once the
+  target can be any Unicode text or metacharacter: it can miss a target
+  present only in hex-encoded form, and it can flag ordinary PDF structure
+  that coincides with a short target by chance. A target already present in
+  the fixture's own fixed non-target bytes (the page text of `BENIGN_BODY`, or
+  the XMP template's own markup when xmp is chosen) is skipped. On that input
+  the residual check in `task4pdf.c`, a raw byte scan over non-structural
+  stream data and not only parsed PDF strings, reports a residual and fails
+  closed, which is correct and irrelevant to the property.
 - `test_empty_target_fails_closed` and
   `test_empty_target_against_page_text_fixtures_fails_closed` assert the
   empty-target case is a fail-closed input error (`rc=1`, an explanatory

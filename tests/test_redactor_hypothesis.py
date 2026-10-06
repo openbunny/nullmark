@@ -2,15 +2,25 @@ from __future__ import annotations
 
 import re
 import string
-import subprocess
 import tempfile
+from itertools import chain
 from pathlib import Path
 from typing import TYPE_CHECKING, Final
 
+import pikepdf
 from hypothesis import HealthCheck, given, settings
 from hypothesis import strategies as st
 
-import pdfutil as pdf
+from conftest import (
+    REPLACEMENT,
+    content_operands,
+    direct,
+    graph,
+    id_pair,
+    result_fields,
+    run_cli,
+    string_text,
+)
 from fixtures.generate import (
     BENIGN_BODY,
     COMBO_SURFACES,
@@ -24,31 +34,25 @@ if TYPE_CHECKING:
 
 _BENIGN_STREAM_TEXT: Final = BENIGN_BODY.decode("latin-1")
 _XMP_WRAPPER_TEXT: Final = XMP_TEMPLATE.format(title="")
-REPLACEMENT: Final = "NEWNAME"
 
 
-def _clean(path: Path, dest: Path) -> str:
-    subprocess.run(
-        ["mutool", "clean", "-d", str(path), str(dest)], check=True, capture_output=True
-    )
-    return dest.read_bytes().decode("latin-1")
+def _string_values(doc: pikepdf.Pdf) -> list[str]:
+    return [
+        string_text(o)
+        for o in chain(graph(doc), content_operands(doc))
+        if isinstance(o, pikepdf.String)
+    ]
 
 
-def _run_cli(
-    cli: Path, in_pdf: Path, out_pdf: Path, find: str, replace: str
-) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
-        [str(cli), str(in_pdf), str(out_pdf), find, replace],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-
-
-def _result_fields(stdout: str) -> dict[str, int]:
-    return {
-        k: int(v) for k, v in re.findall(r"(rc|matches|pages|residual)=(-?\d+)", stdout)
-    }
+def _name_values(doc: pikepdf.Pdf) -> list[str]:
+    out: list[str] = []
+    for obj in chain(graph(doc), direct(doc.trailer)):
+        if isinstance(obj, pikepdf.Name):
+            out.append(obj.unparse().decode("latin-1")[1:])
+        elif isinstance(obj, pikepdf.Dictionary | pikepdf.Stream):
+            keys = obj.keys()
+            out.extend(pikepdf.Name(k).unparse().decode("latin-1")[1:] for k in keys)
+    return out
 
 
 _unicode_target: Final = st.text(
@@ -70,14 +74,10 @@ SURFACES_STRATEGY: Final = st.lists(
 OCCURRENCES_STRATEGY: Final = st.integers(min_value=1, max_value=3)
 
 
-def _combo_value_texts(text: str, surfaces: frozenset[str]) -> list[str]:
-    values = pdf.string_values(text)
+def _combo_value_texts(doc: pikepdf.Pdf, surfaces: frozenset[str]) -> list[str]:
+    values = _string_values(doc)
     if "xmp" in surfaces:
-        trailer = pdf.trailer_dict(text)
-        root = pdf.object_body(text, pdf.ref_num(trailer, "Root"))
-        metadata = pdf.object_body(text, pdf.ref_num(root, "Metadata"))
-        payload = pdf.stream_payload(metadata)
-        values.append(payload.encode("latin-1").decode("utf-8"))
+        values.append(doc.Root.Metadata.read_bytes().decode("utf-8"))
     return values
 
 
@@ -128,19 +128,20 @@ def test_scrub_completeness_and_preservation_across_surfaces(
         in_pdf = tmp_path / "in.pdf"
         out_pdf = tmp_path / "out.pdf"
         build_combo(in_pdf, target, marker, surfaces, occurrences=occurrences)
-        in_clean = _clean(in_pdf, tmp_path / "in.clean.pdf")
-        in_values = _combo_value_texts(in_clean, surfaces)
+        with pikepdf.open(in_pdf) as in_doc:
+            in_values = _combo_value_texts(in_doc, surfaces)
+            in_names = _name_values(in_doc)
         assert any(target in v for v in in_values), (
             "fixture does not carry the target in any decoded string value"
         )
-        unremovable = any(target in n for n in pdf.name_values(in_clean)) or (
+        unremovable = any(target in n for n in in_names) or (
             target.encode("utf-8") in _fixture_id_digest(in_pdf.read_bytes())
         )
 
-        result = _run_cli(
+        result = run_cli(
             cli_binary, in_pdf, out_pdf, target, _replacement_for(target, marker)
         )
-        fields = _result_fields(result.stdout)
+        fields = result_fields(result.stdout)
 
         if fields["rc"] != 0 or fields["residual"] != 0:
             assert not out_pdf.exists(), (
@@ -161,25 +162,21 @@ def test_scrub_completeness_and_preservation_across_surfaces(
             f"no replacement counted; stdout={result.stdout!r}"
         )
 
-        out_clean = _clean(out_pdf, tmp_path / "out.clean.pdf")
-        out_values = _combo_value_texts(out_clean, surfaces)
-        assert not any(target in v for v in out_values), (
-            f"target survives on some surface of {sorted(surfaces)} "
-            f"(decoded-string scan); target={target!r}"
-        )
-        assert any(marker in v for v in out_values), (
-            f"unrelated marker value lost while scrubbing {sorted(surfaces)}; "
-            f"marker={marker!r}"
-        )
+        with pikepdf.open(in_pdf) as in_doc, pikepdf.open(out_pdf) as out_doc:
+            out_values = _combo_value_texts(out_doc, surfaces)
+            assert not any(target in v for v in out_values), (
+                f"target survives on some surface of {sorted(surfaces)} "
+                f"(decoded-string scan); target={target!r}"
+            )
+            assert any(marker in v for v in out_values), (
+                f"unrelated marker value lost while scrubbing {sorted(surfaces)}; "
+                f"marker={marker!r}"
+            )
 
-        assert pdf.header_version(in_clean) == pdf.header_version(out_clean), (
-            "PDF header version changed"
-        )
-        in_trailer, out_trailer = (
-            pdf.trailer_dict(in_clean),
-            pdf.trailer_dict(out_clean),
-        )
-        assert pdf.id_pair(in_trailer) == pdf.id_pair(out_trailer), "/ID array changed"
+            assert in_doc.pdf_version == out_doc.pdf_version, (
+                "PDF header version changed"
+            )
+            assert id_pair(in_doc) == id_pair(out_doc), "/ID array changed"
 
 
 @settings(
@@ -197,8 +194,8 @@ def test_empty_target_fails_closed(
         out_pdf = tmp_path / "out.pdf"
         build_combo(in_pdf, "sentinel-target", marker, surfaces, occurrences=1)
 
-        result = _run_cli(cli_binary, in_pdf, out_pdf, "", REPLACEMENT)
-        fields = _result_fields(result.stdout)
+        result = run_cli(cli_binary, in_pdf, out_pdf, "", REPLACEMENT)
+        fields = result_fields(result.stdout)
         assert fields["rc"] == 1, (
             f"empty target did not fail closed; stdout={result.stdout!r}"
         )
@@ -235,8 +232,8 @@ def test_empty_target_against_page_text_fixtures_fails_closed(
             in_pdf = fixtures[name]
             assert in_pdf is not None
             out_pdf = tmp_path / f"{name}.out.pdf"
-            result = _run_cli(cli_binary, in_pdf, out_pdf, "", replace)
-            fields = _result_fields(result.stdout)
+            result = run_cli(cli_binary, in_pdf, out_pdf, "", replace)
+            fields = result_fields(result.stdout)
             assert fields["rc"] == 1, (
                 f"{name}: empty target did not fail closed; stdout={result.stdout!r}"
             )

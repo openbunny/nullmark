@@ -2,13 +2,25 @@ from __future__ import annotations
 
 import re
 import subprocess
+from itertools import chain
 from pathlib import Path
-from typing import Final
+from typing import TYPE_CHECKING, Final
 
+import pikepdf
 import pytest
 
-import pdfutil as pdf
-from conftest import ROOT
+from conftest import (
+    REPLACEMENT,
+    ROOT,
+    TARGET,
+    content_operands,
+    direct,
+    graph,
+    id_pair,
+    result_fields,
+    run_cli,
+    string_text,
+)
 from fixtures.generate import (
     build_astral_info_only,
     build_bare_reference_only,
@@ -26,8 +38,9 @@ from fixtures.generate import (
     generate_all,
 )
 
-TARGET: Final = "OLDNAME"
-REPLACEMENT: Final = "NEWNAME"
+if TYPE_CHECKING:
+    from collections.abc import Iterable
+
 MAX_TARGET_CODEPOINTS: Final = 256
 
 
@@ -36,11 +49,37 @@ def fixture_pdfs(tmp_path_factory: pytest.TempPathFactory) -> dict[str, Path | N
     return generate_all(tmp_path_factory.mktemp("nullmark-fixtures"), target=TARGET)
 
 
-def _clean(path: Path, dest: Path) -> str:
-    subprocess.run(
-        ["mutool", "clean", "-d", str(path), str(dest)], check=True, capture_output=True
-    )
-    return dest.read_bytes().decode("latin-1")
+def _strings(objects: Iterable[pikepdf.Object]) -> list[str]:
+    return [string_text(o) for o in objects if isinstance(o, pikepdf.String)]
+
+
+def _all_strings(doc: pikepdf.Pdf) -> list[str]:
+    return _strings(chain(graph(doc), content_operands(doc)))
+
+
+def _decoded_bytes(doc: pikepdf.Pdf) -> bytes:
+    parts = [doc.trailer.unparse(resolved=True)]
+    for obj in doc.objects:
+        if not isinstance(obj, pikepdf.Stream):
+            if isinstance(obj, pikepdf.Object):
+                parts.append(obj.unparse(resolved=True))
+            continue
+        parts.append(obj.stream_dict.unparse(resolved=True))
+        try:
+            parts.append(obj.read_bytes())
+        except (pikepdf.PdfError, NotImplementedError):
+            parts.append(obj.read_raw_bytes())
+    return b"\n".join(parts)
+
+
+def _info_as_stored(path: Path) -> str:
+    shown = subprocess.run(
+        ["mutool", "show", "-g", str(path), "trailer/Info"],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout
+    return shown.split(" obj ", 1)[1]
 
 
 def _extract_text(path: Path) -> str:
@@ -53,27 +92,6 @@ def _extract_text(path: Path) -> str:
     return r.stdout
 
 
-def _run_cli(
-    cli: Path,
-    in_pdf: Path,
-    out_pdf: Path,
-    find: str = TARGET,
-    replace: str = REPLACEMENT,
-) -> subprocess.CompletedProcess[str]:
-    return subprocess.run(
-        [str(cli), str(in_pdf), str(out_pdf), find, replace],
-        capture_output=True,
-        text=True,
-        check=False,
-    )
-
-
-def _result_fields(stdout: str) -> dict[str, int]:
-    return {
-        k: int(v) for k, v in re.findall(r"(rc|matches|pages|residual)=(-?\d+)", stdout)
-    }
-
-
 @pytest.mark.parametrize("name", ["simple", "multipage", "cidfont"])
 def test_replace_preserves_metadata(
     name: str, cli_binary: Path, fixture_pdfs: dict[str, Path | None], tmp_path: Path
@@ -82,7 +100,7 @@ def test_replace_preserves_metadata(
     assert in_pdf is not None, f"{name} fixture was not generated"
 
     out_pdf = tmp_path / f"{name}.out.pdf"
-    result = _run_cli(cli_binary, in_pdf, out_pdf)
+    result = run_cli(cli_binary, in_pdf, out_pdf)
     assert out_pdf.exists(), (
         f"CLI produced no output file; stdout={result.stdout!r} "
         f"stderr={result.stderr!r}"
@@ -113,36 +131,29 @@ def test_replace_preserves_metadata(
         "rejected)"
     )
 
-    in_text = _clean(in_pdf, tmp_path / f"{name}.in.clean.pdf")
-    out_text = _clean(out_pdf, tmp_path / f"{name}.out.clean.pdf")
+    with pikepdf.open(in_pdf) as in_doc, pikepdf.open(out_pdf) as out_doc:
+        assert in_doc.pdf_version == out_doc.pdf_version, "PDF header version changed"
 
-    assert pdf.header_version(in_text) == pdf.header_version(out_text), (
-        "PDF header version changed"
-    )
+        if name != "cidfont":
+            assert TARGET.encode() not in _decoded_bytes(out_doc), (
+                "target text literally present in the decompressed object graph"
+            )
+            assert TARGET.encode() not in raw_out, (
+                "target text literally present in the raw output"
+            )
 
-    if name != "cidfont":
-        assert TARGET not in out_text, (
-            "target text literally present in the decompressed content stream"
+        assert id_pair(in_doc) == id_pair(out_doc), "/ID array changed"
+
+        assert in_doc.trailer.Info.unparse(resolved=True) == (
+            out_doc.trailer.Info.unparse(resolved=True)
+        ), "Info dictionary changed"
+        assert _info_as_stored(in_pdf) == _info_as_stored(out_pdf), (
+            "Info dictionary key order or serialization changed"
         )
 
-    in_trailer, out_trailer = pdf.trailer_dict(in_text), pdf.trailer_dict(out_text)
-    assert pdf.id_pair(in_trailer) == pdf.id_pair(out_trailer), "/ID array changed"
-
-    in_info = pdf.object_body(in_text, pdf.ref_num(in_trailer, "Info"))
-    out_info = pdf.object_body(out_text, pdf.ref_num(out_trailer, "Info"))
-    assert pdf.normalize_ws(in_info) == pdf.normalize_ws(out_info), (
-        "Info dictionary changed"
-    )
-
-    in_root = pdf.object_body(in_text, pdf.ref_num(in_trailer, "Root"))
-    out_root = pdf.object_body(out_text, pdf.ref_num(out_trailer, "Root"))
-    in_xmp = pdf.stream_payload(
-        pdf.object_body(in_text, pdf.ref_num(in_root, "Metadata"))
-    )
-    out_xmp = pdf.stream_payload(
-        pdf.object_body(out_text, pdf.ref_num(out_root, "Metadata"))
-    )
-    assert in_xmp == out_xmp, "XMP packet changed"
+        assert (
+            in_doc.Root.Metadata.read_bytes() == out_doc.Root.Metadata.read_bytes()
+        ), "XMP packet changed"
 
 
 SCRUBBED_SURFACES: Final = {
@@ -169,53 +180,61 @@ def test_scrub_removes_target_from_surface(
     in_pdf = fixture_pdfs[name]
     assert in_pdf is not None, f"{name} fixture was not generated"
 
-    in_clean = _clean(in_pdf, tmp_path / f"{name}.in.clean.pdf")
-    assert TARGET in in_clean, (
+    with pikepdf.open(in_pdf) as in_doc:
+        in_decoded = _decoded_bytes(in_doc)
+    assert TARGET.encode() in in_decoded, (
         f"fixture {name} does not carry the target on its surface"
     )
 
     out_pdf = tmp_path / f"{name}.out.pdf"
-    result = _run_cli(cli_binary, in_pdf, out_pdf)
+    result = run_cli(cli_binary, in_pdf, out_pdf)
     assert out_pdf.exists(), (
         f"CLI produced no output; stdout={result.stdout!r} stderr={result.stderr!r}"
     )
 
-    fields = _result_fields(result.stdout)
+    fields = result_fields(result.stdout)
     assert fields["rc"] == 0, f"non-zero rc; stdout={result.stdout!r}"
     assert fields["residual"] == 0, f"residual not zero; stdout={result.stdout!r}"
     assert fields["matches"] >= 1, (
         f"no replacement counted on {name}; stdout={result.stdout!r}"
     )
 
-    out_clean = _clean(out_pdf, tmp_path / f"{name}.out.clean.pdf")
-    assert TARGET not in out_clean, (
-        f"target survives on the {name} surface (independent scan)"
-    )
-    assert REPLACEMENT in out_clean, f"replacement missing on the {name} surface"
-    assert SCRUBBED_SURFACES[name] in out_clean, f"unrelated metadata changed on {name}"
-
-    if name in ("info", "objstm"):
-        in_trailer, out_trailer = (
-            pdf.trailer_dict(in_clean),
-            pdf.trailer_dict(out_clean),
+    with pikepdf.open(in_pdf) as in_doc, pikepdf.open(out_pdf) as out_doc:
+        out_decoded = _decoded_bytes(out_doc)
+        assert TARGET.encode() not in out_decoded, (
+            f"target survives on the {name} surface (independent scan)"
         )
-        in_info = pdf.object_body(in_clean, pdf.ref_num(in_trailer, "Info"))
-        out_info = pdf.object_body(out_clean, pdf.ref_num(out_trailer, "Info"))
-        for key, expected in UNRELATED_INFO_FIELDS.items():
-            in_m = re.search(rf"/{key}\s*(\(.*?\)|<.*?>)", in_info)
-            out_m = re.search(rf"/{key}\s*(\(.*?\)|<.*?>)", out_info)
-            assert in_m, (
-                f"fixture setup: /{key} missing from input Info dict: {in_info!r}"
-            )
-            assert in_m.group(1) == expected, (
-                f"fixture setup: /{key} not {expected!r} in input Info dict: "
-                f"{in_info!r}"
-            )
-            assert out_m, f"/{key} missing from output Info dict: {out_info!r}"
-            assert out_m.group(1) == in_m.group(1), (
-                f"unrelated Info field /{key} changed by scrub: "
-                f"{in_m.group(1)!r} -> {out_m.group(1)!r}"
-            )
+        assert TARGET.encode() not in out_pdf.read_bytes(), (
+            f"target survives on the {name} surface in the raw output"
+        )
+        assert REPLACEMENT.encode() in out_decoded, (
+            f"replacement missing on the {name} surface"
+        )
+        assert SCRUBBED_SURFACES[name].encode() in out_decoded, (
+            f"unrelated metadata changed on {name}"
+        )
+
+        if name in ("info", "objstm"):
+            in_info, out_info = in_doc.trailer.Info, out_doc.trailer.Info
+            for key, expected in UNRELATED_INFO_FIELDS.items():
+                assert f"/{key}" in in_info, (
+                    f"fixture setup: /{key} missing from input Info dict: "
+                    f"{in_info.unparse(resolved=True)!r}"
+                )
+                in_value = in_info[f"/{key}"].unparse()
+                assert in_value == expected.encode(), (
+                    f"fixture setup: /{key} not {expected!r} in input Info dict: "
+                    f"{in_info.unparse(resolved=True)!r}"
+                )
+                assert f"/{key}" in out_info, (
+                    f"/{key} missing from output Info dict: "
+                    f"{out_info.unparse(resolved=True)!r}"
+                )
+                out_value = out_info[f"/{key}"].unparse()
+                assert out_value == in_value, (
+                    f"unrelated Info field /{key} changed by scrub: "
+                    f"{in_value!r} -> {out_value!r}"
+                )
 
 
 def test_embedded_file_target_fails_closed(
@@ -224,15 +243,16 @@ def test_embedded_file_target_fails_closed(
     in_pdf = fixture_pdfs["embedded"]
     assert in_pdf is not None, "embedded fixture was not generated"
 
-    in_clean = _clean(in_pdf, tmp_path / "embedded.in.clean.pdf")
-    assert TARGET in in_clean, (
+    with pikepdf.open(in_pdf) as in_doc:
+        in_decoded = _decoded_bytes(in_doc)
+    assert TARGET.encode() in in_decoded, (
         "embedded fixture does not carry the target in its file stream"
     )
 
     out_pdf = tmp_path / "embedded.out.pdf"
-    result = _run_cli(cli_binary, in_pdf, out_pdf)
+    result = run_cli(cli_binary, in_pdf, out_pdf)
 
-    fields = _result_fields(result.stdout)
+    fields = result_fields(result.stdout)
     assert result.returncode != 0, (
         f"CLI reported success on an embedded target; {result.stdout!r}"
     )
@@ -249,7 +269,7 @@ def test_deep_nesting_fails_closed(cli_binary: Path, tmp_path: Path) -> None:
     build_deep_nesting(in_pdf, TARGET)
 
     out_pdf = tmp_path / "deepnest.out.pdf"
-    result = _run_cli(cli_binary, in_pdf, out_pdf)
+    result = run_cli(cli_binary, in_pdf, out_pdf)
 
     assert result.returncode != 0, (
         f"CLI must fail closed on directly-nested structure past the depth cap "
@@ -265,7 +285,7 @@ def test_oversized_stream_fails_closed(cli_binary: Path, tmp_path: Path) -> None
     build_oversized_xmp(in_pdf)
 
     out_pdf = tmp_path / "oversized_xmp.out.pdf"
-    result = _run_cli(cli_binary, in_pdf, out_pdf)
+    result = run_cli(cli_binary, in_pdf, out_pdf)
 
     assert result.returncode != 0, (
         f"CLI must fail closed on a stream that decompresses past the size cap "
@@ -283,15 +303,16 @@ def test_appearance_stream_target_fails_closed(
     in_pdf = fixture_pdfs["appearance"]
     assert in_pdf is not None, "appearance fixture was not generated"
 
-    in_clean = _clean(in_pdf, tmp_path / "appearance.in.clean.pdf")
-    assert TARGET in in_clean, (
+    with pikepdf.open(in_pdf) as in_doc:
+        in_decoded = _decoded_bytes(in_doc)
+    assert TARGET.encode() in in_decoded, (
         "appearance fixture does not carry the target in its /AP stream"
     )
 
     out_pdf = tmp_path / "appearance.out.pdf"
-    result = _run_cli(cli_binary, in_pdf, out_pdf)
+    result = run_cli(cli_binary, in_pdf, out_pdf)
 
-    fields = _result_fields(result.stdout)
+    fields = result_fields(result.stdout)
     assert result.returncode != 0, (
         f"CLI reported success on an appearance-stream target; {result.stdout!r}"
     )
@@ -316,12 +337,12 @@ def test_incremental_update_remnants_dropped(cli_binary: Path, tmp_path: Path) -
     )
 
     out_pdf = tmp_path / "incremental.out.pdf"
-    result = _run_cli(cli_binary, in_pdf, out_pdf)
+    result = run_cli(cli_binary, in_pdf, out_pdf)
     assert out_pdf.exists(), (
         f"CLI produced no output; stdout={result.stdout!r} stderr={result.stderr!r}"
     )
 
-    fields = _result_fields(result.stdout)
+    fields = result_fields(result.stdout)
     assert fields["rc"] == 0, f"non-zero rc; stdout={result.stdout!r}"
     assert fields["residual"] == 0, f"residual not zero; stdout={result.stdout!r}"
 
@@ -351,12 +372,12 @@ def test_scrub_removes_astral_target(
         build_astral_info_only(in_pdf, ASTRAL_TARGET)
 
     out_pdf = tmp_path / f"{name}.astral.out.pdf"
-    result = _run_cli(cli_binary, in_pdf, out_pdf, ASTRAL_TARGET, REPLACEMENT)
+    result = run_cli(cli_binary, in_pdf, out_pdf, ASTRAL_TARGET, REPLACEMENT)
     assert out_pdf.exists(), (
         f"CLI produced no output; stdout={result.stdout!r} stderr={result.stderr!r}"
     )
 
-    fields = _result_fields(result.stdout)
+    fields = result_fields(result.stdout)
     assert fields["rc"] == 0, f"non-zero rc; stdout={result.stdout!r}"
     assert fields["residual"] == 0, f"residual not zero; stdout={result.stdout!r}"
     assert fields["matches"] >= 1, (
@@ -382,7 +403,7 @@ def test_cli_rejects_empty_target(
     in_pdf = fixture_pdfs["simple"]
     assert in_pdf is not None
     out_pdf = tmp_path / "empty_target.out.pdf"
-    result = _run_cli(cli_binary, in_pdf, out_pdf, "", REPLACEMENT)
+    result = run_cli(cli_binary, in_pdf, out_pdf, "", REPLACEMENT)
     assert result.returncode != 0, (
         f"CLI accepted an empty find string; {result.stdout!r}"
     )
@@ -401,7 +422,7 @@ def test_cli_rejects_oversized_target(
     assert in_pdf is not None
     out_pdf = tmp_path / "oversized_target.out.pdf"
     oversized = "A" * (MAX_TARGET_CODEPOINTS + 1)
-    result = _run_cli(cli_binary, in_pdf, out_pdf, oversized, REPLACEMENT)
+    result = run_cli(cli_binary, in_pdf, out_pdf, oversized, REPLACEMENT)
     assert result.returncode != 0, (
         f"CLI accepted a {MAX_TARGET_CODEPOINTS + 1}-codepoint find string; "
         f"{result.stdout!r}"
@@ -421,7 +442,7 @@ def test_nul_truncated_string_fails_closed(cli_binary: Path, tmp_path: Path) -> 
         "fixture setup: target missing from input"
     )
     out_pdf = tmp_path / "nul.out.pdf"
-    result = _run_cli(cli_binary, in_pdf, out_pdf)
+    result = run_cli(cli_binary, in_pdf, out_pdf)
     assert result.returncode != 0, (
         f"CLI shipped a file with NUL-blind content; {result.stdout!r}"
     )
@@ -437,17 +458,18 @@ def test_bare_reference_to_dict_is_resolved_and_scrubbed(
     in_pdf = tmp_path / "bareref.pdf"
     build_bare_reference_only(in_pdf, TARGET, "dict")
     out_pdf = tmp_path / "bareref.out.pdf"
-    result = _run_cli(cli_binary, in_pdf, out_pdf)
-    fields = _result_fields(result.stdout)
+    result = run_cli(cli_binary, in_pdf, out_pdf)
+    fields = result_fields(result.stdout)
     assert fields["rc"] == 0, f"bare reference refused; stdout={result.stdout!r}"
     assert fields["residual"] == 0, f"residual not zero; stdout={result.stdout!r}"
-    text = _clean(out_pdf, tmp_path / "bareref.clean.pdf")
-    catalog = pdf.object_body(text, pdf.ref_num(pdf.trailer_dict(text), "Root"))
-    alias = pdf.object_body(text, pdf.ref_num(catalog, "Alias"))
-    assert alias.lstrip().startswith("<<"), f"alias still a bare reference: {alias!r}"
-    values = pdf.string_values(alias)
-    assert f"Records for {REPLACEMENT}" in values, f"alias not scrubbed: {values!r}"
-    assert not any(TARGET in v for v in pdf.string_values(text)), "target survived"
+    with pikepdf.open(out_pdf) as out_doc:
+        alias = out_doc.Root.Alias
+        assert isinstance(alias, pikepdf.Dictionary), (
+            f"alias still a bare reference: {alias!r}"
+        )
+        values = _strings(direct(alias))
+        assert f"Records for {REPLACEMENT}" in values, f"alias not scrubbed: {values!r}"
+        assert not any(TARGET in v for v in _all_strings(out_doc)), "target survived"
 
 
 @pytest.mark.parametrize(
@@ -459,7 +481,7 @@ def test_bare_reference_without_copyable_value_fails_closed(
     in_pdf = tmp_path / f"bareref-{aliased}.pdf"
     build_bare_reference_only(in_pdf, TARGET, aliased)
     out_pdf = tmp_path / f"bareref-{aliased}.out.pdf"
-    result = _run_cli(cli_binary, in_pdf, out_pdf)
+    result = run_cli(cli_binary, in_pdf, out_pdf)
     assert result.returncode != 0, f"CLI saved the {aliased} alias; {result.stdout!r}"
     assert reason in result.stdout, f"wrong refusal; {result.stdout!r}"
     assert not out_pdf.exists(), f"fail-closed violated for the {aliased} alias"
@@ -472,8 +494,8 @@ def test_nul_escaped_name_scrubs_clean(cli_binary: Path, tmp_path: Path) -> None
         "fixture setup: target missing from input"
     )
     out_pdf = tmp_path / "nulname.out.pdf"
-    result = _run_cli(cli_binary, in_pdf, out_pdf)
-    fields = _result_fields(result.stdout)
+    result = run_cli(cli_binary, in_pdf, out_pdf)
+    fields = result_fields(result.stdout)
     assert fields["rc"] == 0, f"clean name refused; stdout={result.stdout!r}"
     assert fields["residual"] == 0, f"residual not zero; stdout={result.stdout!r}"
     raw_out = out_pdf.read_bytes()
@@ -508,15 +530,17 @@ def test_xref_stream_id_with_nul_byte_scrubs_clean(
     )
     assert b"/XRef" in in_pdf.read_bytes(), "fixture setup: no cross-reference stream"
     out_pdf = tmp_path / "xrefstm.out.pdf"
-    result = _run_cli(cli_binary, in_pdf, out_pdf)
-    fields = _result_fields(result.stdout)
+    result = run_cli(cli_binary, in_pdf, out_pdf)
+    fields = result_fields(result.stdout)
     assert fields["rc"] == 0, (
         f"NUL-bearing /ID digest refused; stdout={result.stdout!r}"
     )
     assert fields["residual"] == 0, f"residual not zero; stdout={result.stdout!r}"
-    assert TARGET not in _clean(out_pdf, tmp_path / "xrefstm.clean.pdf"), (
-        "target survives in output"
-    )
+    with pikepdf.open(out_pdf) as out_doc:
+        assert TARGET.encode() not in _decoded_bytes(out_doc), (
+            "target survives in output"
+        )
+    assert TARGET.encode() not in out_pdf.read_bytes(), "target survives in raw output"
     assert NUL_LEADING_ID.encode() in out_pdf.read_bytes().lower(), (
         "/ID digest not preserved"
     )
@@ -525,8 +549,8 @@ def test_xref_stream_id_with_nul_byte_scrubs_clean(
 def test_unterminated_trailer_id_fails_closed(cli_binary: Path, tmp_path: Path) -> None:
     in_pdf = ROOT / "CTask4PDF" / "fuzz" / "corpus" / "unterminated-id.pdf"
     out_pdf = tmp_path / "unterminated-id.out.pdf"
-    result = _run_cli(cli_binary, in_pdf, out_pdf)
-    assert _result_fields(result.stdout)["rc"] == 1, (
+    result = run_cli(cli_binary, in_pdf, out_pdf)
+    assert result_fields(result.stdout)["rc"] == 1, (
         f"malformed trailer /ID accepted; stdout={result.stdout!r}"
     )
     assert "trailer /ID" in result.stdout, f"wrong refusal; stdout={result.stdout!r}"
@@ -558,7 +582,7 @@ def test_cli_redacts_under_its_sandbox_profile(
         text=True,
         check=False,
     )
-    fields = _result_fields(result.stdout)
+    fields = result_fields(result.stdout)
     assert (fields["rc"], fields["residual"]) == (0, 0), (
         f"sandboxed run failed; stdout={result.stdout!r} stderr={result.stderr!r}"
     )
@@ -572,8 +596,8 @@ def test_trailer_junk_scrubs_clean(cli_binary: Path, tmp_path: Path) -> None:
         "fixture setup: target missing from input"
     )
     out_pdf = tmp_path / "trailer.out.pdf"
-    result = _run_cli(cli_binary, in_pdf, out_pdf)
-    fields = _result_fields(result.stdout)
+    result = run_cli(cli_binary, in_pdf, out_pdf)
+    fields = result_fields(result.stdout)
     assert fields["rc"] == 0, f"trailer junk refused; stdout={result.stdout!r}"
     assert fields["residual"] == 0, f"residual not zero; stdout={result.stdout!r}"
     raw_out = out_pdf.read_bytes()
@@ -590,8 +614,8 @@ def test_key_bearing_target_fails_closed(cli_binary: Path, tmp_path: Path) -> No
         "fixture setup: target missing from input"
     )
     out_pdf = tmp_path / "key.out.pdf"
-    result = _run_cli(cli_binary, in_pdf, out_pdf)
-    fields = _result_fields(result.stdout)
+    result = run_cli(cli_binary, in_pdf, out_pdf)
+    fields = result_fields(result.stdout)
     assert result.returncode != 0, (
         f"CLI reported success on a key-bearing target; {result.stdout!r}"
     )
@@ -611,12 +635,12 @@ def test_scrub_kitchen_sink_all_surfaces(cli_binary: Path, tmp_path: Path) -> No
     build_kitchen_sink(in_pdf, TARGET)
 
     out_pdf = tmp_path / "kitchen_sink.out.pdf"
-    result = _run_cli(cli_binary, in_pdf, out_pdf)
+    result = run_cli(cli_binary, in_pdf, out_pdf)
     assert out_pdf.exists(), (
         f"CLI produced no output; stdout={result.stdout!r} stderr={result.stderr!r}"
     )
 
-    fields = _result_fields(result.stdout)
+    fields = result_fields(result.stdout)
     assert fields["rc"] == 0, f"non-zero rc; stdout={result.stdout!r}"
     assert fields["residual"] == 0, f"residual not zero; stdout={result.stdout!r}"
     assert fields["matches"] >= KITCHEN_SINK_SURFACE_COUNT, (
@@ -627,9 +651,12 @@ def test_scrub_kitchen_sink_all_surfaces(cli_binary: Path, tmp_path: Path) -> No
     assert TARGET not in extracted, f"target text survives on the page: {extracted!r}"
     assert REPLACEMENT in extracted, f"replacement missing from the page: {extracted!r}"
 
-    out_clean = _clean(out_pdf, tmp_path / "kitchen_sink.out.clean.pdf")
-    assert TARGET not in out_clean, (
-        "target survives somewhere in the combined fixture's output"
+    with pikepdf.open(out_pdf) as out_doc:
+        assert TARGET.encode() not in _decoded_bytes(out_doc), (
+            "target survives somewhere in the combined fixture's output"
+        )
+    assert TARGET.encode() not in out_pdf.read_bytes(), (
+        "target survives in the combined fixture's raw output"
     )
 
 
@@ -660,9 +687,9 @@ def test_utf16le_embedded_target_fails_closed(
     )
 
     out_pdf = tmp_path / "embedded_utf16le.out.pdf"
-    result = _run_cli(cli_binary, in_pdf, out_pdf)
+    result = run_cli(cli_binary, in_pdf, out_pdf)
 
-    fields = _result_fields(result.stdout)
+    fields = result_fields(result.stdout)
     assert result.returncode != 0, (
         f"CLI reported success on a UTF-16LE-only embedded target; {result.stdout!r}"
     )
@@ -686,9 +713,9 @@ def test_hidden_cid_annotation_fails_closed(
         )
 
     out_pdf = tmp_path / "hidden_cid_annot.out.pdf"
-    result = _run_cli(cli_binary, in_pdf, out_pdf)
+    result = run_cli(cli_binary, in_pdf, out_pdf)
 
-    fields = _result_fields(result.stdout)
+    fields = result_fields(result.stdout)
     assert result.returncode != 0, (
         "CLI reported success on a hidden CID-font annotation target; "
         f"{result.stdout!r}"

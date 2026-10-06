@@ -49,7 +49,7 @@ The app does not perform OCR.
 
 ## Install
 
-No release exists. Build from a clone:
+Build from a clone:
 
 ```sh
 just install
@@ -93,12 +93,13 @@ The guarantee is field-level: every non-target value keeps the content it had,
 nothing is dropped or altered, and only occurrences of the target change. For a
 file whose target lives only in the page text, four fields are also asserted
 byte-identical between input and output by `test_replace_preserves_metadata` in
-`tests/test_redactor.py`: the header version line, the Info dictionary (compared
-with whitespace normalized by `pdfutil.normalize_ws`), the XMP metadata stream
+`tests/test_redactor.py`: the header version line, the Info dictionary
+(compared twice: its values as `pikepdf` serializes them, and its key order and
+serialization as `mutool show -g` prints them), the decoded XMP metadata stream
 payload, and both `/ID` array elements. Nothing beyond those four is claimed to
-be byte-identical. The comparison runs on `mutool clean -d` output rather than
-the CLI's raw bytes, because the raw file's object numbering and compression
-differ from the input's.
+be byte-identical. The comparison reads each field through `pikepdf` and
+`mutool` rather than comparing the CLI's raw bytes, because the raw file's
+object numbering and compression differ from the input's.
 
 The output has no second `%%EOF`, no `/Prev` and no MuPDF version string. It
 keeps the versionless `% Written by MuPDF` comment that the save writes.
