@@ -8,7 +8,7 @@ public struct KeyValueGroup<Rows: View>: View {
 
   public var body: some View {
     VStack(alignment: .leading, spacing: Spacing.tight) {
-      Text(verbatim: title).font(.themeBody).foregroundStyle(Color.foreground)
+      Text(verbatim: title).font(.themeBody).foregroundStyle(Color.muted)
       Grid(
         alignment: .leadingFirstTextBaseline,
         horizontalSpacing: Spacing.loose,

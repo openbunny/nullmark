@@ -28,6 +28,10 @@ is the `Components` preview and shows every component.
 - `sprout` marks state (`StatusMessage` with `.valid`) and string tokens in a
   `ShellCommandLine`, nothing else. `LinkButtonStyle` draws a link as `ink`
   text with a `line` underline.
+- Text colour follows the websites' roles. `foreground` is body text: headings,
+  values, chips, buttons, commands. `muted` is everything that labels or
+  explains: section numbers, keys, group titles, field labels, captions and a
+  neutral `StatusMessage`. `ink` is a link.
 - Weights are the theme's regular and bold.
 - No component draws a decorative icon. `StatusBanner` takes its mark from the
   caller.

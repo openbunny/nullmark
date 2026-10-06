@@ -127,6 +127,8 @@ The app follows the same component rules as the openbunny websites:
   which depends only on the theme so it can move to an OpenBunny repository.
   Each appears in its `ComponentGallery`; a view-local copy of one is a second
   system, and nothing app-specific enters the package.
+- `foreground` is body text; anything that labels or explains is `muted`; a
+  link is `ink`. The package README lists which component takes which.
 - `sprout` marks state only. A link uses `LinkButtonStyle`: `ink` text with a
   `line` underline.
 - No decorative icons. Text drawn from data is `Text(verbatim:)`, so a file

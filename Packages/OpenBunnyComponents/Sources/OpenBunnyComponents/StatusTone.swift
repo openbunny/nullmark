@@ -10,7 +10,7 @@ public enum StatusTone: Sendable, CaseIterable {
   var color: Color {
     switch self {
     case .neutral:
-      Color.foreground
+      Color.muted
 
     case .valid:
       Status.enabled.color
