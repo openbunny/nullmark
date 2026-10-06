@@ -15,7 +15,7 @@ struct StatusBanner<Actions: View>: View {
         .accessibilityHidden(true)
         .frame(width: markSide, height: markSide)
       Text(title)
-        .font(.themeHeading)
+        .font(.themeTitle)
         .foregroundStyle(Color.foreground)
       Text(message)
         .font(.themeBody)

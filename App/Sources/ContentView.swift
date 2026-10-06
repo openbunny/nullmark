@@ -5,7 +5,6 @@ import SwiftUI
 
 private let sidebarWidth: CGFloat = 380
 private let dropZonePadding: CGFloat = 28
-private let dropZoneDashLength: CGFloat = 6
 private let chooseButtonWidth: CGFloat = 220
 private let headerMarkSide: CGFloat = 44
 private let stackedTextSpacing: CGFloat = 2
@@ -20,12 +19,16 @@ struct ContentView: View {
   var body: some View {
     HStack(spacing: 0) {
       ScrollView {
-        VStack(alignment: .leading, spacing: Spacing.loose) {
+        VStack(alignment: .leading, spacing: Spacing.page) {
           Header()
-          fileCard
+          PageSection(number: "01", title: "document", ruled: false) { documentSection }
           if model.document != nil {
-            replaceCard
-            metadataCard
+            PageSection(number: "02", title: "replace") { replaceSection }
+            if let metadata = model.metadata {
+              PageSection(number: "03", title: "captured metadata") {
+                metadataSection(metadata)
+              }
+            }
           }
         }
         .padding(Spacing.loose)
@@ -55,107 +58,78 @@ struct ContentView: View {
     }
   }
 
-  @ViewBuilder private var fileCard: some View {
-    Card(title: "Document", symbol: "doc") {
-      if let url = model.fileURL, let document = model.document {
-        fileSummary(url: url, document: document)
-      } else {
-        fileDropButton
-      }
-      if let status = model.status, model.document == nil {
-        statusLabel(status)
-      }
+  @ViewBuilder private var documentSection: some View {
+    if let url = model.fileURL, let document = model.document {
+      fileSummary(url: url, document: document)
+    } else {
+      fileDropButton
+    }
+    if let status = model.status, model.document == nil {
+      statusLine(status)
     }
   }
 
   private var fileDropButton: some View {
     Button(action: model.choose) {
-      VStack(spacing: Spacing.tight) {
-        Image(systemName: "arrow.down.doc").accessibilityHidden(true).font(.themeTitle)
-        Text("Drop a PDF or click to choose").font(.themeBody)
-      }
-      .frame(maxWidth: .infinity)
-      .padding(.vertical, dropZonePadding)
-      .foregroundStyle(Color.muted)
-      .background(
-        RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
-          .strokeBorder(
-            Color.border,
-            style: StrokeStyle(lineWidth: Metric.borderWidth, dash: [dropZoneDashLength]))
-      )
-      .contentShape(Rectangle())
+      Text("drop a pdf or click to choose")
+        .font(.themeBody)
+        .frame(maxWidth: .infinity)
+        .padding(.vertical, dropZonePadding)
+        .foregroundStyle(Color.muted)
+        .background(dropTargeted ? Color.paperDeep : Color.paper)
+        .overlay(Rectangle().stroke(Color.border, lineWidth: Metric.borderWidth))
+        .contentShape(Rectangle())
     }
     .buttonStyle(.plain)
   }
 
-  private var replaceCard: some View {
-    Card(title: "Replace", symbol: "arrow.left.arrow.right") {
-      LabeledField(
-        label: "Find", placeholder: "Text in the PDF", text: $model.findText)
-      LabeledField(label: "Replace with", placeholder: "New text", text: $model.replaceText)
-      Button(action: model.apply) {
-        Label("Apply Replacement", systemImage: "wand.and.stars")
-      }
-      .buttonStyle(.outline)
-      .keyboardShortcut(.return, modifiers: .command)
-      .disabled(model.findText.isEmpty || model.isApplying)
-      Button(action: model.export) {
-        Label("Export PDF…", systemImage: "square.and.arrow.up")
-      }
-      .buttonStyle(.outline)
-      .keyboardShortcut("s", modifiers: .command)
-      .disabled(!model.edited || model.isApplying)
-      if let status = model.status {
-        statusLabel(status)
-      }
+  @ViewBuilder private var replaceSection: some View {
+    LabeledField(label: "find", placeholder: "text in the pdf", text: $model.findText)
+    LabeledField(label: "replace with", placeholder: "new text", text: $model.replaceText)
+    HStack(spacing: Spacing.base) {
+      Button("apply replacement", action: model.apply)
+        .buttonStyle(.outline)
+        .keyboardShortcut(.return, modifiers: .command)
+        .disabled(model.findText.isEmpty || model.isApplying)
+      Button("export pdf…", action: model.export)
+        .buttonStyle(.outline)
+        .keyboardShortcut("s", modifiers: .command)
+        .disabled(!model.edited || model.isApplying)
     }
-  }
-
-  @ViewBuilder private var metadataCard: some View {
-    if let metadata = model.metadata {
-      Card(title: "Captured Metadata", symbol: "tag") {
-        infoSection(metadata)
-        documentSection(metadata)
-        if let file = model.fileMetadata {
-          fileSystemSection(file)
-        }
-      }
+    if let status = model.status {
+      statusLine(status)
     }
   }
 
   @ViewBuilder private var preview: some View {
     if let document = model.document {
       PDFKitView(document: document)
-        .clipShape(RoundedRectangle(cornerRadius: Radius.lg, style: .continuous))
-        .overlay(
-          RoundedRectangle(cornerRadius: Radius.lg, style: .continuous)
-            .strokeBorder(Color.border, lineWidth: Metric.borderWidth)
-        )
+        .overlay(Rectangle().stroke(Color.border, lineWidth: Metric.borderWidth))
         .overlay(alignment: .topTrailing) {
-          Group {
-            if model.edited {
-              Tag(text: "Edited")
-            } else {
-              Tag(text: "Original", tint: Color.muted)
-            }
-          }
-          .padding(Spacing.base)
+          Chip(text: model.edited ? "edited" : "original")
+            .padding(Spacing.base)
         }
         .padding(Spacing.loose)
     } else {
       StatusBanner(
-        title: "Drop a PDF to begin",
-        message:
-          "Its metadata is captured before any change and written back after."
+        title: "drop a pdf to begin",
+        message: "its metadata is captured before any change and written back after."
       ) {
-        Button(action: model.choose) {
-          Label("Choose PDF…", systemImage: "arrow.down.doc")
-        }
-        .buttonStyle(.outline)
-        .frame(width: chooseButtonWidth)
+        Button("choose pdf…", action: model.choose)
+          .buttonStyle(.outline)
+          .frame(width: chooseButtonWidth)
       }
       .background(dropTargeted ? Color.paperDeep : Color.clear)
       .animation(reduceMotion ? nil : .default, value: dropTargeted)
+    }
+  }
+
+  @ViewBuilder
+  private func metadataSection(_ metadata: PDFMetadata) -> some View {
+    infoGroup(metadata)
+    documentGroup(metadata)
+    if let file = model.fileMetadata {
+      fileSystemGroup(file)
     }
   }
 
@@ -165,68 +139,59 @@ struct ContentView: View {
       ByteCountFormatter.string(fromByteCount: Int64(bytes), countStyle: .file)
     }
     return VStack(alignment: .leading, spacing: Spacing.base) {
-      HStack(spacing: Spacing.base) {
-        Image(systemName: "doc.richtext.fill")
-          .accessibilityHidden(true)
-          .font(.themeTitle)
-          .foregroundStyle(Color.sprout)
-        VStack(alignment: .leading, spacing: stackedTextSpacing) {
-          Text(url.lastPathComponent)
-            .font(.themeBody.weight(.semibold))
-            .foregroundStyle(Color.foreground)
-            .lineLimit(1)
-            .truncationMode(.middle)
-          Text([pages, size].compactMap(\.self).joined(separator: " · "))
-            .font(.themeCaption)
-            .foregroundStyle(Color.muted)
-        }
-        Spacer()
+      VStack(alignment: .leading, spacing: stackedTextSpacing) {
+        Text(verbatim: url.lastPathComponent)
+          .font(.themeMono)
+          .foregroundStyle(Color.foreground)
+          .lineLimit(1)
+          .truncationMode(.middle)
+        Text(verbatim: [pages, size].compactMap(\.self).joined(separator: " · "))
+          .font(.themeCaption)
+          .foregroundStyle(Color.muted)
       }
       HStack(spacing: Spacing.loose) {
-        Button("Open Another…", action: model.choose)
-        Button("Revert", action: model.revert).disabled(!model.edited)
+        Button("open another…", action: model.choose)
+        Button("revert", action: model.revert).disabled(!model.edited)
       }
-      .buttonStyle(.plain)
-      .font(.themeBody)
-      .foregroundStyle(Color.sprout)
+      .buttonStyle(.inkLink)
     }
   }
 
-  private func infoSection(_ metadata: PDFMetadata) -> some View {
-    metadataSection("Info dictionary") {
+  private func infoGroup(_ metadata: PDFMetadata) -> some View {
+    KeyValueGroup(title: "info dictionary") {
       if metadata.info.isEmpty {
-        KeyValueRow(key: "—", value: "No Info dictionary")
+        KeyValueRow(key: "entries", value: "none")
       }
       ForEach(metadata.info) { KeyValueRow(key: $0.key, value: $0.display) }
     }
   }
 
-  private func documentSection(_ metadata: PDFMetadata) -> some View {
+  private func documentGroup(_ metadata: PDFMetadata) -> some View {
     let xmp =
       metadata.xmp.map { packet in
         ByteCountFormatter.string(fromByteCount: Int64(packet.count), countStyle: .file)
-      } ?? "None"
-    return metadataSection("Document") {
-      KeyValueRow(key: "PDF version", value: metadata.version)
-      KeyValueRow(key: "Document ID", value: metadata.fileID ?? "None")
-      KeyValueRow(key: "XMP packet", value: xmp)
+      } ?? "none"
+    return KeyValueGroup(title: "document") {
+      KeyValueRow(key: "pdf version", value: metadata.version)
+      KeyValueRow(key: "document id", value: metadata.fileID ?? "none")
+      KeyValueRow(key: "xmp packet", value: xmp)
     }
   }
 
-  private func fileSystemSection(_ file: FileMetadata) -> some View {
-    metadataSection("File system") {
+  private func fileSystemGroup(_ file: FileMetadata) -> some View {
+    KeyValueGroup(title: "file system") {
       KeyValueRow(
-        key: "Created",
-        value: file.created?.formatted(date: .abbreviated, time: .standard) ?? "Unknown")
+        key: "created",
+        value: file.created?.formatted(date: .abbreviated, time: .standard) ?? "unknown")
       KeyValueRow(
-        key: "Modified",
-        value: file.modified?.formatted(date: .abbreviated, time: .standard) ?? "Unknown")
+        key: "modified",
+        value: file.modified?.formatted(date: .abbreviated, time: .standard) ?? "unknown")
       KeyValueRow(
-        key: "Accessed",
-        value: file.accessed?.formatted(date: .abbreviated, time: .standard) ?? "Unknown")
+        key: "accessed",
+        value: file.accessed?.formatted(date: .abbreviated, time: .standard) ?? "unknown")
       KeyValueRow(
-        key: "Permissions",
-        value: file.permissions.map { String($0, radix: octalRadix) } ?? "Unknown")
+        key: "permissions",
+        value: file.permissions.map { String($0, radix: octalRadix) } ?? "unknown")
       ForEach(file.extendedAttributes.sorted { $0.key < $1.key }, id: \.key) { attribute in
         KeyValueRow(
           key: attribute.key,
@@ -236,27 +201,22 @@ struct ContentView: View {
     }
   }
 
-  private func statusLabel(_ status: EditorModel.Status) -> StatusText {
-    switch status {
-    case .info(let text):
-      StatusText(LocalizedStringKey(text), status: .enabled)
+  private func statusLine(_ status: EditorModel.Status) -> some View {
+    let (text, color): (String, Color) =
+      switch status {
+      case .info(let text):
+        (text, Color.foreground)
 
-    case .success(let text):
-      StatusText(LocalizedStringKey(text), status: .enabled)
+      case .success(let text):
+        (text, Status.enabled.color)
 
-    case .failure(let text):
-      StatusText(LocalizedStringKey(text), status: .disabled)
-    }
-  }
-
-  private func metadataSection(
-    _ title: String, @ViewBuilder content: () -> some View
-  ) -> some View {
-    VStack(alignment: .leading, spacing: Spacing.tight) {
-      Text(title).font(.themeBody.weight(.semibold)).foregroundStyle(Color.foreground)
-      content()
-    }
-    .padding(.top, Spacing.tight)
+      case .failure(let text):
+        (text, Status.disabled.color)
+      }
+    return Text(verbatim: text)
+      .font(.themeBody)
+      .foregroundStyle(color)
+      .fixedSize(horizontal: false, vertical: true)
   }
 }
 
@@ -266,17 +226,11 @@ private struct Header: View {
       NullmarkMark()
         .accessibilityHidden(true)
         .frame(width: headerMarkSide, height: headerMarkSide)
-        .background(
-          Color.paper, in: RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
-        )
-        .overlay(
-          RoundedRectangle(cornerRadius: Radius.md, style: .continuous)
-            .strokeBorder(Color.border, lineWidth: Metric.borderWidth))
       VStack(alignment: .leading, spacing: stackedTextSpacing) {
-        Text("Nullmark")
-          .font(.themeBody.weight(.bold))
+        Text("nullmark")
+          .font(.themeTitle)
           .foregroundStyle(Color.foreground)
-        Text("Replace text in PDFs, verify nothing survives")
+        Text("replace text in a pdf and verify none of it survives")
           .font(.themeCaption)
           .foregroundStyle(Color.muted)
       }
@@ -294,21 +248,24 @@ struct NullmarkMark: View {
   }
 }
 
-private struct Card<Content: View>: View {
+private struct PageSection<Content: View>: View {
+  let number: String
   let title: String
-  let symbol: String
+  var ruled = true
   @ViewBuilder let content: () -> Content
 
   var body: some View {
     VStack(alignment: .leading, spacing: Spacing.base) {
-      Label(title, systemImage: symbol)
-        .font(.themeBody.weight(.semibold))
-        .foregroundStyle(Color.foreground)
+      SectionHeading(number: number, title: title)
       content()
     }
-    .padding(Spacing.loose)
-    .background(Color.paperInset)
-    .overlay(Rectangle().stroke(Color.border, lineWidth: Metric.borderWidth))
+    .frame(maxWidth: .infinity, alignment: .leading)
+    .padding(.top, ruled ? Spacing.page : 0)
+    .overlay(alignment: .top) {
+      if ruled {
+        Rectangle().fill(Color.border).frame(height: Metric.borderWidth)
+      }
+    }
   }
 }
 
@@ -319,13 +276,33 @@ private struct LabeledField: View {
 
   var body: some View {
     VStack(alignment: .leading, spacing: Spacing.tight) {
-      Text(label).font(.themeBody).foregroundStyle(Color.foreground)
+      Text(label).font(.themeBody).foregroundStyle(Color.muted)
       TextField(placeholder, text: $text)
-        .font(.themeBody)
+        .textFieldStyle(.plain)
+        .font(.themeMono)
         .padding(Spacing.base)
         .background(Color.paper)
         .overlay(Rectangle().stroke(Color.border, lineWidth: Metric.borderWidth))
     }
+  }
+}
+
+private struct KeyValueGroup<Rows: View>: View {
+  let title: String
+  @ViewBuilder let rows: () -> Rows
+
+  var body: some View {
+    VStack(alignment: .leading, spacing: Spacing.tight) {
+      Text(title).font(.themeBody).foregroundStyle(Color.foreground)
+      Grid(
+        alignment: .leadingFirstTextBaseline,
+        horizontalSpacing: Spacing.loose,
+        verticalSpacing: Spacing.tight
+      ) {
+        rows()
+      }
+    }
+    .padding(.top, Spacing.tight)
   }
 }
 
@@ -334,20 +311,18 @@ private struct KeyValueRow: View {
   let value: String
 
   var body: some View {
-    HStack(alignment: .firstTextBaseline, spacing: Spacing.base) {
-      Text(key).font(.themeBody).foregroundStyle(Color.muted)
-      Spacer()
-      Text(value)
-        .font(.themeMono)
+    GridRow {
+      Text(verbatim: key).foregroundStyle(Color.muted)
+      Text(verbatim: value)
         .foregroundStyle(Color.foreground)
-        .multilineTextAlignment(.trailing)
+        .textSelection(.enabled)
     }
+    .font(.themeMono)
   }
 }
 
-private struct Tag: View {
+private struct Chip: View {
   let text: String
-  var tint = Color.sprout
 
   var body: some View {
     Text(text)
@@ -355,7 +330,7 @@ private struct Tag: View {
       .foregroundStyle(Color.foreground)
       .padding(.horizontal, Spacing.base)
       .padding(.vertical, Spacing.tight)
-      .background(tint)
+      .background(Color.paperDeep)
   }
 }
 

@@ -18,7 +18,7 @@ struct FileMetadata: Equatable {
 
       case .embeddedNULPath:
         return
-          "The file path contains a NUL character (U+0000), which C string interop truncates. Rename it and try again."
+          "the file path contains a nul character (U+0000), which c string interop truncates. rename it and try again."
       }
     }
   }

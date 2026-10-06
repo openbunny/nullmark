@@ -117,6 +117,18 @@ rule `theme_tokens` fails on a literal in `App/`. A missing token is added in
 `App/Assets/AppIcon.icon`; the in-app mark's SVG is a symlink to the icon's
 glyph.
 
+The app follows the same component rules as the openbunny websites:
+
+- UI copy is lowercase: labels, headings, buttons and status messages. A
+  literal (a file name, a PDF key, `U+0000`) keeps its own case.
+- Sections are separated by a 1-point `border` rule under a numbered
+  `SectionHeading`. At most two regions carry a filled ground.
+- `sprout` marks state only. A link uses `LinkButtonStyle`: `ink` text with a
+  `line` underline.
+- No decorative icons. Text drawn from data is `Text(verbatim:)`, so a file
+  name is never parsed as Markdown.
+- Weights are the theme's regular and bold; Courier Prime has no semibold.
+
 ## Documentation states the present
 
 A document says what is the case. It records no counts, dates, versions,

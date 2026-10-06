@@ -11,7 +11,7 @@ struct OutlineButtonStyle: ButtonStyle {
 
   func makeBody(configuration: Configuration) -> some View {
     configuration.label
-      .font(.themeCaption.weight(.semibold))
+      .font(.themeCaption)
       .foregroundStyle(Color.foreground)
       .padding(.horizontal, Spacing.base)
       .padding(.vertical, Spacing.tight)

@@ -16,9 +16,9 @@ struct CopyButton: View {
 
   let text: String
   let label: String
-  var caption = "Copy"
-  var copiedCaption = "Copied"
-  var failureHint = "Select the text and copy it by hand."
+  var caption = "copy"
+  var copiedCaption = "copied"
+  var failureHint = "select the text and copy by hand."
 
   @State private var state: CopyState = .idle
   @State private var dimmed = false
@@ -27,7 +27,7 @@ struct CopyButton: View {
   var body: some View {
     VStack(alignment: .trailing, spacing: Spacing.tight) {
       Button(action: copy) {
-        Text(dimmed ? copiedCaption : caption).textCase(.uppercase)
+        Text(dimmed ? copiedCaption : caption)
       }
       .buttonStyle(.outline)
       .accessibilityLabel(label)

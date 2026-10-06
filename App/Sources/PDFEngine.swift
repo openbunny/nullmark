@@ -44,15 +44,15 @@ enum PDFEngineError: LocalizedError {
   var errorDescription: String? {
     switch self {
     case .embeddedNUL(let field):
-      "The \(field) text contains a NUL character (U+0000), which C string interop truncates. Remove it and try again."
+      "the \(field) text contains a nul character (U+0000), which c string interop truncates. remove it and try again."
 
     case .failed(let message):
       message
 
     case .residual(let count):
       """
-      The document still contains \(count) occurrence\(count == 1 ? "" : "s") of the text \
-      after redaction. The output was discarded.
+      the document still contains \(count) occurrence\(count == 1 ? "" : "s") of the text \
+      after redaction. the output was discarded.
       """
     }
   }

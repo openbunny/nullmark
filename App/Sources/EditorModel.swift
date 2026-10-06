@@ -21,7 +21,7 @@ final class EditorModel {
       switch self {
       case .residue(let directory):
         """
-        The unredacted working copy at \(directory.path) could not be deleted. \
+        the unredacted working copy at \(directory.path) could not be deleted. \
         It still contains the original text; remove it manually.
         """
       }
@@ -132,12 +132,12 @@ final class EditorModel {
           return
         }
         guard let pdf = PDFDocument(data: loaded.data) else {
-          self.status = .failure("\(url.lastPathComponent) is not a readable PDF.")
+          self.status = .failure("\(url.lastPathComponent) is not a readable pdf.")
           return
         }
         guard !pdf.isLocked else {
           self.status = .failure(
-            "\(url.lastPathComponent) is password-protected. Remove the password in Preview, then open it again."
+            "\(url.lastPathComponent) is password-protected. remove the password in preview, then open it again."
           )
           return
         }
@@ -147,7 +147,7 @@ final class EditorModel {
         self.fileMetadata = loaded.metadata
         self.metadata = PDFMetadata(document: pdf, data: loaded.data)
         self.edited = false
-        self.status = .info("Metadata captured. Enter the text to replace.")
+        self.status = .info("metadata captured. enter the text to replace.")
       } catch {
         guard ticket == self.generation else {
           return
@@ -194,11 +194,11 @@ final class EditorModel {
   private func acceptApplyOutcome(_ outcome: Replacement, find: String) {
     guard outcome.matches > 0 else {
       self.status = .failure(
-        "\"\(find)\" does not occur in the PDF's text layer. Matching is case-sensitive.")
+        "\"\(find)\" does not occur in the pdf's text layer. matching is case-sensitive.")
       return
     }
     guard let outputDocument = PDFDocument(data: outcome.data) else {
-      self.status = .failure("The edited PDF could not be reopened. The original is unchanged.")
+      self.status = .failure("the edited pdf could not be reopened. the original is unchanged.")
       return
     }
     self.data = outcome.data
@@ -207,8 +207,8 @@ final class EditorModel {
     let pages = "\(outcome.pagesChanged) page\(outcome.pagesChanged == 1 ? "" : "s")"
     self.status = .success(
       """
-      Replaced \(outcome.matches) occurrence\(outcome.matches == 1 ? "" : "s") across \
-      \(pages). Document metadata preserved.
+      replaced \(outcome.matches) occurrence\(outcome.matches == 1 ? "" : "s") across \
+      \(pages). document metadata preserved.
       """
     )
   }
@@ -233,13 +233,13 @@ final class EditorModel {
           let attributes = "\(count) extended attribute\(count == 1 ? "" : "s")"
           self.status = .success(
             """
-            Saved \(url.lastPathComponent). File dates, permissions and \
+            saved \(url.lastPathComponent). file dates, permissions and \
             \(attributes) verified identical.
             """
           )
         } else {
           self.status = .failure(
-            "Saved \(url.lastPathComponent), but these items differ from the original: "
+            "saved \(url.lastPathComponent), but these items differ from the original: "
               + (diff.refused + diff.differences).joined(separator: ", "))
         }
       } catch {

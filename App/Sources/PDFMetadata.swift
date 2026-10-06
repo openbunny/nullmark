@@ -28,7 +28,7 @@ struct PDFMetadata {
     guard let header = String(bytes: data.prefix(headerProbeLength), encoding: .ascii),
       let marker = header.range(of: "%PDF-")
     else {
-      return "Unknown"
+      return "unknown"
     }
     return String(header[marker.upperBound...].prefix(versionLength))
   }

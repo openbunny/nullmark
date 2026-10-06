@@ -24,18 +24,19 @@ private struct ComponentGallery: View {
         if let fontFailure {
           Text(fontFailure.localizedDescription).foregroundStyle(Color.foreground)
         }
-        SectionHeading(number: "01", title: "Section heading")
-        SectionHeading(number: "02", title: "Command line and copy button")
+        SectionHeading(number: "01", title: "section heading")
+        SectionHeading(number: "02", title: "command line and copy button")
         CommandLine(command: #"nullmark-cli --find "Old Name" --replace "New Name" in.pdf out.pdf"#)
-        CopyButton(text: "copied text", label: "Copy sample text")
-        SectionHeading(number: "03", title: "Outline buttons")
+        CopyButton(text: "copied text", label: "copy sample text")
+        SectionHeading(number: "03", title: "outline and link buttons")
         HStack(spacing: Spacing.base) {
-          Button("Enabled") { taps += 1 }.buttonStyle(.outline)
-          Button("Disabled") { taps += 1 }.buttonStyle(.outline).disabled(true)
+          Button("enabled") { taps += 1 }.buttonStyle(.outline)
+          Button("disabled") { taps += 1 }.buttonStyle(.outline).disabled(true)
+          Button("link") { taps += 1 }.buttonStyle(.inkLink)
         }
-        SectionHeading(number: "04", title: "Status banner")
-        StatusBanner(title: "Drop a PDF to begin", message: "Status banner with one action.") {
-          Button("Choose PDF…") { taps += 1 }.buttonStyle(.outline)
+        SectionHeading(number: "04", title: "status banner")
+        StatusBanner(title: "drop a pdf to begin", message: "status banner with one action.") {
+          Button("choose pdf…") { taps += 1 }.buttonStyle(.outline)
         }
         .frame(height: Self.bannerHeight)
       }

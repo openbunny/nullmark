@@ -13,7 +13,7 @@ struct SectionHeading: View {
         .foregroundStyle(Color.muted)
         .accessibilityHidden(true)
       Text(title)
-        .font(.themeBody.weight(.semibold))
+        .font(.themeHeading)
         .foregroundStyle(Color.foreground)
     }
   }

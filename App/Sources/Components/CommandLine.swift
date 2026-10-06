@@ -15,7 +15,7 @@ struct CommandLine: View {
       .font(.themeMono)
       .frame(maxWidth: .infinity, alignment: .leading)
       CopyButton(
-        text: command, label: copyLabel ?? "Copy command: \(command)")
+        text: command, label: copyLabel ?? "copy command: \(command)")
     }
     .padding(.horizontal, Spacing.base)
     .padding(.vertical, Spacing.tight)

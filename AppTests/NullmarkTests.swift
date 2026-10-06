@@ -66,7 +66,7 @@ struct NullmarkTests {
       Issue.record("unexpected status: \(String(describing: model.status))")
       return
     }
-    #expect(text.hasPrefix("Metadata captured"))
+    #expect(text.hasPrefix("metadata captured"))
     #expect(!model.edited)
     #expect(!model.isApplying)
   }
