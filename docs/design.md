@@ -84,8 +84,9 @@ The byte-identity claims and their limits are in
 and builds `libmupdf.a` and `libmupdf-third.a` with MuPDF's own Makefile.
 `project.yml` links both from `build/dev/mupdf`, so the app, the CLI, the test
 suite and the fuzz target run the same MuPDF. LLVM (clang-format, clang-tidy,
-LeakSanitizer, libFuzzer, llvm-cov) and cppcheck are workstation prerequisites
-outside `mise.toml`; the `justfile` header lists them. The AGPL terms for distributing a linked build are in
+LeakSanitizer, libFuzzer, llvm-cov) and cppcheck come from Homebrew through the
+`Brewfile`, which `just install` applies. The AGPL terms for distributing a
+linked build are in
 [README.md](../README.md#license). The sandbox and hardened-runtime entitlements
 are described in
 [README.md](../README.md#sandbox-and-hardened-runtime).
