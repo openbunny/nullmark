@@ -44,30 +44,10 @@ struct NullmarkTests {
 
   @Test(.timeLimit(.minutes(1)))
   func applyDropsStaleGeneration() async throws {
-    unsafe _ = setenv("T4_FAKE_DELAY_ON", "first", 1)
-    unsafe _ = setenv("T4_FAKE_DELAY_MS", String(staleDelayMilliseconds), 1)
-    defer {
-      unsafe _ = unsetenv("T4_FAKE_DELAY_ON")
-      unsafe _ = unsetenv("T4_FAKE_DELAY_MS")
+    let model = try await withDelayedFirstApply { model, _ in
+      model.findText = "second"
+      model.apply()
     }
-    let fixture = URL(fileURLWithPath: #filePath)
-      .deletingLastPathComponent()
-      .deletingLastPathComponent()
-      .appendingPathComponent("CTask4PDF/fuzz/corpus/simple.pdf")
-    let model = EditorModel()
-    model.load(fixture)
-    for _ in 0..<loadPolls where model.document == nil && model.status == nil {
-      try await Task.sleep(for: .milliseconds(loadPollMilliseconds))
-    }
-    try #require(model.document != nil, "fixture did not load: \(String(describing: model.status))")
-
-    model.findText = "first"
-    model.apply()
-    try await Task.sleep(for: .milliseconds(secondApplyOffsetMilliseconds))
-    model.findText = "second"
-    model.apply()
-    try await Task.sleep(for: .milliseconds(applySettleMilliseconds))
-
     guard case .failure(let text) = model.status else {
       Issue.record("unexpected status: \(String(describing: model.status))")
       return
@@ -79,6 +59,21 @@ struct NullmarkTests {
 
   @Test(.timeLimit(.minutes(1)))
   func loadDropsInFlightApply() async throws {
+    let model = try await withDelayedFirstApply { model, fixture in
+      model.load(fixture)
+    }
+    guard case .info(let text) = model.status else {
+      Issue.record("unexpected status: \(String(describing: model.status))")
+      return
+    }
+    #expect(text.hasPrefix("Metadata captured"))
+    #expect(!model.edited)
+    #expect(!model.isApplying)
+  }
+
+  private func withDelayedFirstApply(
+    _ interrupt: (EditorModel, URL) -> Void
+  ) async throws -> EditorModel {
     unsafe _ = setenv("T4_FAKE_DELAY_ON", "first", 1)
     unsafe _ = setenv("T4_FAKE_DELAY_MS", String(staleDelayMilliseconds), 1)
     defer {
@@ -99,16 +94,9 @@ struct NullmarkTests {
     model.findText = "first"
     model.apply()
     try await Task.sleep(for: .milliseconds(secondApplyOffsetMilliseconds))
-    model.load(fixture)
+    interrupt(model, fixture)
     try await Task.sleep(for: .milliseconds(applySettleMilliseconds))
-
-    guard case .info(let text) = model.status else {
-      Issue.record("unexpected status: \(String(describing: model.status))")
-      return
-    }
-    #expect(text.hasPrefix("Metadata captured"))
-    #expect(!model.edited)
-    #expect(!model.isApplying)
+    return model
   }
 }
 
