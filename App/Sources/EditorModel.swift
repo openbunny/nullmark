@@ -239,7 +239,7 @@ final class EditorModel {
     }
     let panel = NSSavePanel()
     panel.allowedContentTypes = [.pdf]
-    panel.nameFieldStringValue = fileURL.deletingPathExtension().lastPathComponent + " edited.pdf"
+    panel.nameFieldStringValue = fileURL.lastPathComponent
     guard panel.runModal() == .OK, let url = panel.url else {
       return
     }
