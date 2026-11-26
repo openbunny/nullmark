@@ -16,7 +16,7 @@ osv-scanner = "2.6.0"
 "pipx:reuse" = { version = "6.2.0", extras = "charset-normalizer", uvx = false }
 pipx = "1.17.11"
 python = "3.14.8"
-ruff = "0.16.10"
+ruff = "0.17.6"
 shellcheck = "0.11.0"
 swiftlint = "0.65.1"
 uv = "0.12.21"
