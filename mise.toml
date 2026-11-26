@@ -15,7 +15,7 @@ osv-scanner = "2.6.0"
 # replayed without source builds, so reuse installs through pipx.
 "pipx:reuse" = { version = "6.2.0", extras = "charset-normalizer", uvx = false }
 pipx = "1.17.11"
-python = "3.14.8"
+python = "3.15.2"
 ruff = "0.16.10"
 shellcheck = "0.11.0"
 swiftlint = "0.65.1"
