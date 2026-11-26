@@ -9,7 +9,7 @@ gitleaks = "8.30.1"
 just = "1.58.0"
 lefthook = "2.1.16"
 ninja = "1.13.2"
-osv-scanner = "2.6.0"
+osv-scanner = "2.7.1"
 "pipx:gcovr" = "8.6"
 # Reason: reuse ships no macOS wheel, and a locked uv dependency graph is
 # replayed without source builds, so reuse installs through pipx.
