@@ -13,7 +13,7 @@ configFiles:
 packages:
   OpenBunnyTheme:
     url: 'https://github.com/openbunny/theme'
-    version: '0.2.0'
+    version: '0.2.3'
 settings:
   base:
     MACOSX_DEPLOYMENT_TARGET: '27.0'
