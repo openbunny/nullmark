@@ -338,9 +338,9 @@ specifiers = ["8.6"]
 uv = { path = ".mise/locks/pipx-gcovr/8.6", digest = "sha256:24dc6016ecaf778eb17a72fa077abaa6a511d7c76b268dad4d278d01bc14a01a" }
 
 [[tools."pipx:reuse"]]
-version = "6.2.0"
+version = "6.3.0"
 backend = "pipx:reuse"
-specifiers = ["6.2.0"]
+specifiers = ["6.3.0"]
 
 [tools."pipx:reuse".options]
 extras = "charset-normalizer"
