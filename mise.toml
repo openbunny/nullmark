@@ -14,7 +14,7 @@ osv-scanner = "2.6.0"
 # Reason: reuse ships no macOS wheel, and a locked uv dependency graph is
 # replayed without source builds, so reuse installs through pipx.
 "pipx:reuse" = { version = "6.2.0", extras = "charset-normalizer", uvx = false }
-pipx = "1.17.11"
+pipx = "1.19.1"
 python = "3.14.8"
 ruff = "0.16.10"
 shellcheck = "0.11.0"
