@@ -556,19 +556,28 @@ url_api = "https://api.github.com/repos/astral-sh/uv/releases/assets/599238008"
 provenance = "github-attestations"
 
 [[tools.xcodegen]]
-version = "2.46.0"
+version = "2.49.0"
 backend = "aqua:yonaskolb/XcodeGen"
-specifiers = ["2.46.0"]
+specifiers = ["2.49.0"]
+unsupported_platforms = [
+    "linux-arm64",
+    "linux-arm64-musl",
+    "linux-x64",
+    "linux-x64-musl",
+    "windows-x64",
+]
 
 [tools.xcodegen."platforms.macos-arm64"]
-checksum = "sha256:4d9e34b62172d645eed6457cac13fc222569974098ef4ee9c3368bedf0196806"
-url = "https://github.com/yonaskolb/XcodeGen/releases/download/2.46.0/xcodegen.zip"
-url_api = "https://api.github.com/repos/yonaskolb/XcodeGen/releases/assets/478866069"
+checksum = "sha256:ae5598b33a19ad1e23e775d6648f97375c3529c970905f489358a21055b65e53"
+checksum_source = "mise-versions"
+url = "https://github.com/yonaskolb/XcodeGen/releases/download/2.49.0/xcodegen.zip"
+url_api = "https://api.github.com/repos/yonaskolb/XcodeGen/releases/assets/793459189"
 
 [tools.xcodegen."platforms.macos-x64"]
-checksum = "sha256:4d9e34b62172d645eed6457cac13fc222569974098ef4ee9c3368bedf0196806"
-url = "https://github.com/yonaskolb/XcodeGen/releases/download/2.46.0/xcodegen.zip"
-url_api = "https://api.github.com/repos/yonaskolb/XcodeGen/releases/assets/478866069"
+checksum = "sha256:ae5598b33a19ad1e23e775d6648f97375c3529c970905f489358a21055b65e53"
+checksum_source = "mise-versions"
+url = "https://github.com/yonaskolb/XcodeGen/releases/download/2.49.0/xcodegen.zip"
+url_api = "https://api.github.com/repos/yonaskolb/XcodeGen/releases/assets/793459189"
 
 [[tools.zizmor]]
 version = "1.30.1"
